@@ -6,9 +6,9 @@ use macroquad::camera::{Camera3D, set_camera, set_default_camera};
 use macroquad::camera::Projection;
 
 #[cfg(feature = "gui")]
-use spelletje_mac::physics::{Physics, PhysicsImpl, PhysicsConfig};
+use spelletje_mac::physics::PhysicsImpl;
 #[cfg(feature = "gui")]
-use spelletje_mac::input::{Input, InputSource, MacroquadInput};
+use spelletje_mac::input::{InputSource, MacroquadInput};
 #[cfg(feature = "gui")]
 use spelletje_mac::world::World;
 #[cfg(feature = "gui")]

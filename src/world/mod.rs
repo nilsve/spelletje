@@ -1,5 +1,5 @@
 use crate::player::Player;
-use crate::obstacle::{Aabb, Obstacle, ObstacleKind};
+use crate::obstacle::{Aabb, Obstacle};
 use crate::physics::{Physics, CollisionResult};
 use crate::input::Input;
 
