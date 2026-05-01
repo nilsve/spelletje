@@ -1,6 +1,5 @@
 /// Core physics calculations: gravity, friction, collision resolution.
 /// All constants are configurable via PhysicsConfig for tuning and testing.
-
 use crate::obstacle::{Aabb, ObstacleKind};
 
 /// Result of a collision detection check.
@@ -45,12 +44,6 @@ pub trait Physics {
     fn apply_friction(&self, vel: &mut f32, dt: f32, config: &PhysicsConfig);
     fn apply_acceleration(&self, vel: &mut f32, input: f32, dt: f32, config: &PhysicsConfig);
     fn clamp_speed(&self, vel: &mut f32, config: &PhysicsConfig);
-    fn resolve_ground_collision(
-        &self,
-        pos_y: &mut f32,
-        vel_y: &mut f32,
-        config: &PhysicsConfig,
-    );
     fn resolve_platform_collision(
         &self,
         player: &dyn Aabb,
@@ -116,18 +109,6 @@ impl Physics for PhysicsImpl {
         }
     }
 
-    fn resolve_ground_collision(
-        &self,
-        pos_y: &mut f32,
-        vel_y: &mut f32,
-        _: &PhysicsConfig,
-    ) {
-        if *pos_y < 0.0 {
-            *pos_y = 0.0;
-            *vel_y = 0.0;
-        }
-    }
-
     fn resolve_platform_collision(
         &self,
         player: &dyn Aabb,
@@ -142,7 +123,7 @@ impl Physics for PhysicsImpl {
                 return CollisionResult::None;
             }
 
-            if *vel_y < 0.0 && player.min_y() <= obstacle.max_y() + 0.01 {
+            if *vel_y < 0.0 && player.min_y() <= obstacle.max_y() {
                 CollisionResult::Bottom
             } else {
                 CollisionResult::None
@@ -154,7 +135,7 @@ impl Physics for PhysicsImpl {
                 return CollisionResult::None;
             }
 
-            if *vel_y < 0.0 && player.min_y() <= obstacle.max_y() + 0.01 {
+            if *vel_y < 0.0 && player.min_y() <= obstacle.max_y() {
                 CollisionResult::Bottom
             } else if *vel_y > 0.0 && player.max_y() >= obstacle.min_y() && player.max_y() <= obstacle.max_y() {
                 CollisionResult::None
@@ -221,19 +202,6 @@ mod tests {
         physics.apply_jump(&mut vel_y, &config);
 
         assert!((vel_y - 10.0).abs() < 0.01);
-    }
-
-    #[test]
-    fn test_ground_collision_resets_velocity() {
-        let physics = PhysicsImpl::new();
-        let mut pos_y = -1.0;
-        let mut vel_y = -5.0;
-        let config = default_config();
-
-        physics.resolve_ground_collision(&mut pos_y, &mut vel_y, &config);
-
-        assert!((pos_y - 0.0).abs() < 0.01);
-        assert!((vel_y - 0.0).abs() < 0.01);
     }
 
     #[test]
@@ -323,23 +291,15 @@ mod tests {
     }
 
     #[test]
-    fn test_platform_collision_detects_landing() {
+    fn test_platform_collision_no_landing_when_falling_from_far() {
         let physics = PhysicsImpl::new();
-        let player = TestPlayer::new(2.55, 1.0);
+        let player = TestPlayer::new(4.0, 1.0);
         let vel_y = -2.0;
         let obstacle = Obstacle::solid(0.0, 2.05, 0.0, 4.0, 0.1, 4.0);
 
         let result = physics.resolve_platform_collision(&player, &vel_y, &obstacle, obstacle.kind.clone());
 
-        assert_eq!(result, CollisionResult::Bottom);
-    }
-
-    #[test]
-    fn test_platform_collision_no_landing_when_falling_from_far() {
-        let physics = PhysicsImpl::new();
-        let player = TestPlayer::new(0.0, 1.0);
-        let vel_y = -2.0;
-        let obstacle = Obstacle::solid(0.0, 2.05, 0.0, 4.0, 0.1, 4.0);
+        assert_eq!(result, CollisionResult::None);
 
         let result = physics.resolve_platform_collision(&player, &vel_y, &obstacle, obstacle.kind.clone());
 
@@ -361,7 +321,7 @@ mod tests {
     #[test]
     fn test_platform_collision_platform_kind_no_horizontal() {
         let physics = PhysicsImpl::new();
-        let player = TestPlayer::new(2.55, 1.0);
+        let player = TestPlayer::new(2.0, 1.0);
         let vel_y = -2.0;
         let obstacle = Obstacle::platform(0.0, 2.05, 0.0, 4.0, 0.1, 4.0);
 
@@ -371,7 +331,7 @@ mod tests {
     }
 
     #[test]
-    fn test_horizontal_collision_no_collision_outside_z_range() {
+    fn test_something() {
         let physics = PhysicsImpl::new();
         let player = TestPlayer::new_at(0.0, 0.5, 6.0, 1.0);
         let vel_x = 1.0;

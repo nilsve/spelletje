@@ -29,8 +29,8 @@ async fn game_loop() {
     let mut world = World::new();
 
     world.add_platform(0.0, -0.25, 0.0, 100.0, 0.5, 100.0);
-    world.add_platform(5.0, 1.5, 0.0, 4.0, 0.5, 4.0);
-    world.add_platform(-5.0, 2.5, 0.0, 3.0, 0.5, 3.0);
+    world.add_obstacle(Obstacle::solid(5.0, 1.5, 0.0, 4.0, 0.5, 4.0));
+    world.add_obstacle(Obstacle::solid(-5.0, 2.5, 0.0, 3.0, 0.5, 3.0));
 
     let player = Player::new();
     world.add_entity(player);

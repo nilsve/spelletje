@@ -1,6 +1,5 @@
 /// Obstacle: a static world object that entities collide with.
 /// Can be a solid obstacle (wall/floor/ceiling) or a one-way platform.
-
 pub trait Aabb {
     fn min_x(&self) -> f32;
     fn max_x(&self) -> f32;

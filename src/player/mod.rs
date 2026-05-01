@@ -137,7 +137,6 @@ impl Player {
         }
 
         // Ground collision (before jump so grounded check works after gravity)
-        physics.resolve_ground_collision(&mut self.y, &mut self.vel_y, &pc);
         if self.y <= self.config.friction_threshold && self.vel_y == 0.0 && !input.jump {
             self.grounded = true;
         }

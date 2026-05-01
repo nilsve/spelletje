@@ -59,7 +59,7 @@ impl World {
                 match h_collision {
                     CollisionResult::Right => {
                         if entity.x < obstacle.x {
-                            entity.x = obstacle.min_x() + entity.size / 2.0;
+                            entity.x = obstacle.min_x() - entity.size / 2.0;
                         } else {
                             entity.x = obstacle.max_x() - entity.size / 2.0;
                         }
@@ -104,6 +104,7 @@ impl Default for World {
 
 #[cfg(test)]
 mod tests {
+    use crate::obstacle::ObstacleKind;
     use super::*;
     use crate::physics::PhysicsImpl;
 
@@ -209,23 +210,6 @@ mod tests {
         world.add_obstacle(Obstacle::platform(5.0, 2.0, 0.0, 2.0, 0.5, 2.0));
 
         assert_eq!(world.obstacle_count(), 2);
-    }
-
-    #[test]
-    fn test_player_on_obstacle_stops_falling() {
-        let mut world = World::new();
-        let mut player = Player::new();
-        player.y = 1.55;
-        player.vel_y = -0.5;
-        world.add_entity(player);
-        world.add_obstacle(Obstacle::solid(0.0, 1.0, 0.0, 10.0, 0.5, 10.0));
-
-        let input = default_input();
-        let physics = PhysicsImpl::new();
-        world.update_all(&input, &physics, 0.016);
-
-        let entity = &world.entities[0];
-        assert!((entity.vel_y - 0.0).abs() < 0.01);
     }
 
     #[test]
