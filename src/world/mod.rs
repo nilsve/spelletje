@@ -1,19 +1,19 @@
 use crate::player::Player;
-use crate::platform::{Aabb, Platform};
-use crate::physics::{Physics, PhysicsConfig, CollisionResult};
+use crate::obstacle::{Aabb, Obstacle, ObstacleKind};
+use crate::physics::{Physics, CollisionResult};
 use crate::input::Input;
 
-/// Manages the game world: entities, platforms, and their interactions.
+/// Manages the game world: entities, obstacles, and their interactions.
 pub struct World {
     pub entities: Vec<Player>,
-    pub platforms: Vec<Platform>,
+    pub obstacles: Vec<Obstacle>,
 }
 
 impl World {
     pub fn new() -> Self {
         Self {
             entities: Vec::new(),
-            platforms: Vec::new(),
+            obstacles: Vec::new(),
         }
     }
 
@@ -21,8 +21,12 @@ impl World {
         self.entities.push(entity);
     }
 
-    pub fn add_platform(&mut self, platform: Platform) {
-        self.platforms.push(platform);
+    pub fn add_obstacle(&mut self, obstacle: Obstacle) {
+        self.obstacles.push(obstacle);
+    }
+
+    pub fn add_platform(&mut self, x: f32, y: f32, z: f32, width: f32, height: f32, depth: f32) {
+        self.obstacles.push(Obstacle::platform(x, y, z, width, height, depth));
     }
 
     pub fn update_all(&mut self, input: &Input, physics: &dyn Physics, dt: f32) {
@@ -31,14 +35,15 @@ impl World {
         }
 
         for entity in &mut self.entities {
-            for platform in &self.platforms {
+            for obstacle in &self.obstacles {
                 let collision = physics.resolve_platform_collision(
                     entity,
                     &entity.vel_y,
-                    platform,
+                    obstacle,
+                    obstacle.kind.clone(),
                 );
                 if collision == CollisionResult::Bottom {
-                    entity.y = platform.max_y();
+                    entity.y = obstacle.max_y();
                     entity.vel_y = 0.0;
                     entity.set_grounded(true);
                     let config = entity.config.to_physics_config();
@@ -48,22 +53,23 @@ impl World {
                 let h_collision = physics.resolve_horizontal_collision(
                     entity,
                     &entity.vel_x,
-                    platform,
+                    obstacle,
+                    obstacle.kind.clone(),
                 );
                 match h_collision {
                     CollisionResult::Right => {
-                        if entity.x < platform.x {
-                            entity.x = platform.min_x() + entity.size / 2.0;
+                        if entity.x < obstacle.x {
+                            entity.x = obstacle.min_x() + entity.size / 2.0;
                         } else {
-                            entity.x = platform.max_x() - entity.size / 2.0;
+                            entity.x = obstacle.max_x() - entity.size / 2.0;
                         }
                         entity.vel_x = 0.0;
                     }
                     CollisionResult::Left => {
-                        if entity.x < platform.x {
-                            entity.x = platform.min_x() - entity.size / 2.0;
+                        if entity.x < obstacle.x {
+                            entity.x = obstacle.min_x() - entity.size / 2.0;
                         } else {
-                            entity.x = platform.max_x() + entity.size / 2.0;
+                            entity.x = obstacle.max_x() + entity.size / 2.0;
                         }
                         entity.vel_x = 0.0;
                     }
@@ -81,8 +87,12 @@ impl World {
         self.entities.len()
     }
 
+    pub fn obstacle_count(&self) -> usize {
+        self.obstacles.len()
+    }
+
     pub fn platform_count(&self) -> usize {
-        self.platforms.len()
+        self.obstacle_count()
     }
 }
 
@@ -111,7 +121,7 @@ mod tests {
     fn test_new_world_is_empty() {
         let world = World::new();
         assert_eq!(world.entity_count(), 0);
-        assert_eq!(world.platform_count(), 0);
+        assert_eq!(world.obstacle_count(), 0);
     }
 
     #[test]
@@ -125,13 +135,21 @@ mod tests {
     }
 
     #[test]
-    fn test_add_and_remove_platform() {
+    fn test_add_and_remove_obstacle() {
         let mut world = World::new();
-        world.add_platform(Platform::new(0.0, 0.0, 0.0, 4.0, 0.5, 4.0));
-        assert_eq!(world.platform_count(), 1);
+        world.add_obstacle(Obstacle::solid(0.0, 0.0, 0.0, 4.0, 0.5, 4.0));
+        assert_eq!(world.obstacle_count(), 1);
 
-        world.platforms.clear();
-        assert_eq!(world.platform_count(), 0);
+        world.obstacles.clear();
+        assert_eq!(world.obstacle_count(), 0);
+    }
+
+    #[test]
+    fn test_add_platform_convenience() {
+        let mut world = World::new();
+        world.add_platform(0.0, -0.25, 0.0, 100.0, 0.5, 100.0);
+        assert_eq!(world.obstacle_count(), 1);
+        assert_eq!(world.obstacles[0].kind, ObstacleKind::Platform);
     }
 
     #[test]
@@ -149,13 +167,13 @@ mod tests {
     }
 
     #[test]
-    fn test_platform_collision_with_world() {
+    fn test_obstacle_collision_with_world() {
         let mut world = World::new();
         let mut player = Player::new();
         player.y = 5.0;
         player.vel_y = -10.0;
         world.add_entity(player);
-        world.add_platform(Platform::new(0.0, 0.0, 0.0, 10.0, 0.5, 10.0));
+        world.add_obstacle(Obstacle::solid(0.0, 0.0, 0.0, 10.0, 0.5, 10.0));
 
         let input = default_input();
         let physics = PhysicsImpl::new();
@@ -185,22 +203,22 @@ mod tests {
     }
 
     #[test]
-    fn test_multiple_platforms() {
+    fn test_multiple_obstacles() {
         let mut world = World::new();
-        world.add_platform(Platform::new(0.0, 1.0, 0.0, 4.0, 0.5, 4.0));
-        world.add_platform(Platform::new(5.0, 2.0, 0.0, 2.0, 0.5, 2.0));
+        world.add_obstacle(Obstacle::solid(0.0, 1.0, 0.0, 4.0, 0.5, 4.0));
+        world.add_obstacle(Obstacle::platform(5.0, 2.0, 0.0, 2.0, 0.5, 2.0));
 
-        assert_eq!(world.platform_count(), 2);
+        assert_eq!(world.obstacle_count(), 2);
     }
 
     #[test]
-    fn test_player_on_platform_stops_falling() {
+    fn test_player_on_obstacle_stops_falling() {
         let mut world = World::new();
         let mut player = Player::new();
         player.y = 1.55;
         player.vel_y = -0.5;
         world.add_entity(player);
-        world.add_platform(Platform::new(0.0, 1.0, 0.0, 10.0, 0.5, 10.0));
+        world.add_obstacle(Obstacle::solid(0.0, 1.0, 0.0, 10.0, 0.5, 10.0));
 
         let input = default_input();
         let physics = PhysicsImpl::new();
@@ -208,5 +226,27 @@ mod tests {
 
         let entity = &world.entities[0];
         assert!((entity.vel_y - 0.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_platform_no_horizontal_collision() {
+        let mut world = World::new();
+        let mut player = Player::new();
+        player.x = 3.0;
+        player.vel_x = 2.0;
+        player.y = 1.0;
+        world.add_entity(player);
+        // Solid wall at x=5
+        world.add_obstacle(Obstacle::solid(5.0, 1.0, 0.0, 1.0, 2.0, 10.0));
+        // Platform above (should not block horizontal movement)
+        world.add_obstacle(Obstacle::platform(5.0, 3.0, 0.0, 4.0, 0.5, 10.0));
+
+        let input = default_input();
+        let physics = PhysicsImpl::new();
+        world.update_all(&input, &physics, 0.016);
+
+        let entity = &world.entities[0];
+        // Should hit the solid wall at x=5
+        assert!(entity.x < 5.5);
     }
 }

@@ -1,6 +1,6 @@
 pub mod physics;
 pub mod player;
-pub mod platform;
+pub mod obstacle;
 pub mod world;
 pub mod input;
 pub mod projectile;

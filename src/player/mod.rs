@@ -1,6 +1,6 @@
-use crate::physics::{Physics, PhysicsConfig, PhysicsImpl};
+use crate::physics::{Physics, PhysicsConfig};
 use crate::input::Input;
-use crate::platform::Aabb;
+use crate::obstacle::Aabb;
 
 #[derive(Clone, Debug)]
 pub struct PlayerConfig {

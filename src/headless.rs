@@ -2,7 +2,6 @@ use crate::physics::PhysicsImpl;
 use crate::input::Input;
 use crate::world::World;
 use crate::player::Player;
-use crate::platform::Platform;
 /// Parse an input string like "a3w3d2" into a list of (char, seconds).
 /// Each char is followed by a number of seconds to hold it.
 fn parse_input(s: &str) -> Vec<(char, u64)> {
@@ -50,7 +49,7 @@ pub fn run_cli(input_str: &str) {
     let mut elapsed = 0.0;
     let mut world = World::new();
     world.add_entity(Player::new());
-    world.add_platform(Platform::new(0.0, -0.25, 0.0, 100.0, 0.5, 100.0));
+    world.add_platform(0.0, -0.25, 0.0, 100.0, 0.5, 100.0);
     let physics = PhysicsImpl::new();
     println!("Running CLI simulation with input: {}", input_str);
     println!("Sequence: {:?}", sequence);

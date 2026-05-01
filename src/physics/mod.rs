@@ -1,7 +1,7 @@
 /// Core physics calculations: gravity, friction, collision resolution.
 /// All constants are configurable via PhysicsConfig for tuning and testing.
 
-use crate::platform::Aabb;
+use crate::obstacle::{Aabb, ObstacleKind};
 
 /// Result of a collision detection check.
 #[derive(Clone, Debug, PartialEq)]
@@ -55,13 +55,15 @@ pub trait Physics {
         &self,
         player: &dyn Aabb,
         vel_y: &f32,
-        platform: &dyn Aabb,
+        obstacle: &dyn Aabb,
+        kind: ObstacleKind,
     ) -> CollisionResult;
     fn resolve_horizontal_collision(
         &self,
         player: &dyn Aabb,
         vel_x: &f32,
-        platform: &dyn Aabb,
+        obstacle: &dyn Aabb,
+        kind: ObstacleKind,
     ) -> CollisionResult;
 }
 
@@ -118,7 +120,7 @@ impl Physics for PhysicsImpl {
         &self,
         pos_y: &mut f32,
         vel_y: &mut f32,
-        config: &PhysicsConfig,
+        _: &PhysicsConfig,
     ) {
         if *pos_y < 0.0 {
             *pos_y = 0.0;
@@ -130,18 +132,35 @@ impl Physics for PhysicsImpl {
         &self,
         player: &dyn Aabb,
         vel_y: &f32,
-        platform: &dyn Aabb,
+        obstacle: &dyn Aabb,
+        kind: ObstacleKind,
     ) -> CollisionResult {
-        let overlap_x = player.max_x() >= platform.min_x() && player.min_x() <= platform.max_x();
-        let overlap_z = player.max_z() >= platform.min_z() && player.min_z() <= platform.max_z();
-        if !overlap_x || !overlap_z {
-            return CollisionResult::None;
-        }
+        if kind == ObstacleKind::Platform {
+            let overlap_x = player.max_x() >= obstacle.min_x() && player.min_x() <= obstacle.max_x();
+            let overlap_z = player.max_z() >= obstacle.min_z() && player.min_z() <= obstacle.max_z();
+            if !overlap_x || !overlap_z {
+                return CollisionResult::None;
+            }
 
-        if *vel_y < 0.0 && player.min_y() <= platform.max_y() + 0.01 {
-            CollisionResult::Bottom
+            if *vel_y < 0.0 && player.min_y() <= obstacle.max_y() + 0.01 {
+                CollisionResult::Bottom
+            } else {
+                CollisionResult::None
+            }
         } else {
-            CollisionResult::None
+            let overlap_x = player.max_x() >= obstacle.min_x() && player.min_x() <= obstacle.max_x();
+            let overlap_z = player.max_z() >= obstacle.min_z() && player.min_z() <= obstacle.max_z();
+            if !overlap_x || !overlap_z {
+                return CollisionResult::None;
+            }
+
+            if *vel_y < 0.0 && player.min_y() <= obstacle.max_y() + 0.01 {
+                CollisionResult::Bottom
+            } else if *vel_y > 0.0 && player.max_y() >= obstacle.min_y() && player.max_y() <= obstacle.max_y() {
+                CollisionResult::None
+            } else {
+                CollisionResult::None
+            }
         }
     }
 
@@ -149,17 +168,22 @@ impl Physics for PhysicsImpl {
         &self,
         player: &dyn Aabb,
         vel_x: &f32,
-        platform: &dyn Aabb,
+        obstacle: &dyn Aabb,
+        kind: ObstacleKind,
     ) -> CollisionResult {
-        let overlap_y = player.max_y() > platform.min_y() && player.min_y() < platform.max_y();
-        let overlap_z = player.max_z() >= platform.min_z() && player.min_z() <= platform.max_z();
+        if kind == ObstacleKind::Platform {
+            return CollisionResult::None;
+        }
+
+        let overlap_y = player.max_y() > obstacle.min_y() && player.min_y() < obstacle.max_y();
+        let overlap_z = player.max_z() >= obstacle.min_z() && player.min_z() <= obstacle.max_z();
         if !overlap_y || !overlap_z {
             return CollisionResult::None;
         }
 
-        if *vel_x > 0.0 && player.max_x() > platform.min_x() && player.min_x() <= platform.min_x() {
+        if *vel_x > 0.0 && player.max_x() > obstacle.min_x() && player.min_x() <= obstacle.min_x() {
             CollisionResult::Right
-        } else if *vel_x < 0.0 && player.min_x() < platform.max_x() && player.max_x() >= platform.max_x() {
+        } else if *vel_x < 0.0 && player.min_x() < obstacle.max_x() && player.max_x() >= obstacle.max_x() {
             CollisionResult::Left
         } else {
             CollisionResult::None
@@ -170,7 +194,7 @@ impl Physics for PhysicsImpl {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::platform::Platform;
+    use crate::obstacle::Obstacle;
 
     fn default_config() -> PhysicsConfig {
         PhysicsConfig::default()
@@ -303,9 +327,9 @@ mod tests {
         let physics = PhysicsImpl::new();
         let player = TestPlayer::new(2.55, 1.0);
         let vel_y = -2.0;
-        let platform = Platform::new(0.0, 2.05, 0.0, 4.0, 0.1, 4.0);
+        let obstacle = Obstacle::solid(0.0, 2.05, 0.0, 4.0, 0.1, 4.0);
 
-        let result = physics.resolve_platform_collision(&player, &vel_y, &platform);
+        let result = physics.resolve_platform_collision(&player, &vel_y, &obstacle, obstacle.kind.clone());
 
         assert_eq!(result, CollisionResult::Bottom);
     }
@@ -315,9 +339,9 @@ mod tests {
         let physics = PhysicsImpl::new();
         let player = TestPlayer::new(0.0, 1.0);
         let vel_y = -2.0;
-        let platform = Platform::new(0.0, 2.05, 0.0, 4.0, 0.1, 4.0);
+        let obstacle = Obstacle::solid(0.0, 2.05, 0.0, 4.0, 0.1, 4.0);
 
-        let result = physics.resolve_platform_collision(&player, &vel_y, &platform);
+        let result = physics.resolve_platform_collision(&player, &vel_y, &obstacle, obstacle.kind.clone());
 
         assert_eq!(result, CollisionResult::None);
     }
@@ -327,11 +351,23 @@ mod tests {
         let physics = PhysicsImpl::new();
         let player = TestPlayer::new(2.5, 1.0);
         let vel_y = 2.0;
-        let platform = Platform::new(0.0, 2.05, 0.0, 4.0, 0.1, 4.0);
+        let obstacle = Obstacle::solid(0.0, 2.05, 0.0, 4.0, 0.1, 4.0);
 
-        let result = physics.resolve_platform_collision(&player, &vel_y, &platform);
+        let result = physics.resolve_platform_collision(&player, &vel_y, &obstacle, obstacle.kind.clone());
 
         assert_eq!(result, CollisionResult::None);
+    }
+
+    #[test]
+    fn test_platform_collision_platform_kind_no_horizontal() {
+        let physics = PhysicsImpl::new();
+        let player = TestPlayer::new(2.55, 1.0);
+        let vel_y = -2.0;
+        let obstacle = Obstacle::platform(0.0, 2.05, 0.0, 4.0, 0.1, 4.0);
+
+        let result = physics.resolve_platform_collision(&player, &vel_y, &obstacle, obstacle.kind.clone());
+
+        assert_eq!(result, CollisionResult::Bottom);
     }
 
     #[test]
@@ -339,9 +375,9 @@ mod tests {
         let physics = PhysicsImpl::new();
         let player = TestPlayer::new_at(0.0, 0.5, 6.0, 1.0);
         let vel_x = 1.0;
-        let platform = Platform::new(0.0, 0.5, 0.0, 10.0, 1.0, 4.0);
+        let obstacle = Obstacle::solid(0.0, 0.5, 0.0, 10.0, 1.0, 4.0);
 
-        let result = physics.resolve_horizontal_collision(&player, &vel_x, &platform);
+        let result = physics.resolve_horizontal_collision(&player, &vel_x, &obstacle, obstacle.kind.clone());
 
         assert_eq!(result, CollisionResult::None);
     }
@@ -351,9 +387,9 @@ mod tests {
         let physics = PhysicsImpl::new();
         let player = TestPlayer::new_at(0.0, 5.0, 0.0, 1.0);
         let vel_x = 1.0;
-        let platform = Platform::new(0.0, 0.5, 0.0, 10.0, 1.0, 10.0);
+        let obstacle = Obstacle::solid(0.0, 0.5, 0.0, 10.0, 1.0, 10.0);
 
-        let result = physics.resolve_horizontal_collision(&player, &vel_x, &platform);
+        let result = physics.resolve_horizontal_collision(&player, &vel_x, &obstacle, obstacle.kind.clone());
 
         assert_eq!(result, CollisionResult::None);
     }
@@ -363,9 +399,9 @@ mod tests {
         let physics = PhysicsImpl::new();
         let player = TestPlayer::new_at(4.6, 0.5, 0.0, 1.0);
         let vel_x = 1.0;
-        let platform = Platform::new(5.0, 0.5, 0.0, 1.0, 1.0, 2.0);
+        let obstacle = Obstacle::solid(5.0, 0.5, 0.0, 1.0, 1.0, 2.0);
 
-        let result = physics.resolve_horizontal_collision(&player, &vel_x, &platform);
+        let result = physics.resolve_horizontal_collision(&player, &vel_x, &obstacle, obstacle.kind.clone());
 
         assert_eq!(result, CollisionResult::Right);
     }
@@ -375,9 +411,9 @@ mod tests {
         let physics = PhysicsImpl::new();
         let player = TestPlayer::new_at(-4.6, 0.5, 0.0, 1.0);
         let vel_x = -1.0;
-        let platform = Platform::new(-5.0, 0.5, 0.0, 1.0, 1.0, 2.0);
+        let obstacle = Obstacle::solid(-5.0, 0.5, 0.0, 1.0, 1.0, 2.0);
 
-        let result = physics.resolve_horizontal_collision(&player, &vel_x, &platform);
+        let result = physics.resolve_horizontal_collision(&player, &vel_x, &obstacle, obstacle.kind.clone());
 
         assert_eq!(result, CollisionResult::Left);
     }
@@ -387,9 +423,21 @@ mod tests {
         let physics = PhysicsImpl::new();
         let player = TestPlayer::new_at(4.0, 0.5, 0.0, 1.0);
         let vel_x = 0.0;
-        let platform = Platform::new(5.0, 0.5, 0.0, 1.0, 1.0, 2.0);
+        let obstacle = Obstacle::solid(5.0, 0.5, 0.0, 1.0, 1.0, 2.0);
 
-        let result = physics.resolve_horizontal_collision(&player, &vel_x, &platform);
+        let result = physics.resolve_horizontal_collision(&player, &vel_x, &obstacle, obstacle.kind.clone());
+
+        assert_eq!(result, CollisionResult::None);
+    }
+
+    #[test]
+    fn test_platform_kind_no_horizontal_collision() {
+        let physics = PhysicsImpl::new();
+        let player = TestPlayer::new_at(4.6, 0.5, 0.0, 1.0);
+        let vel_x = 1.0;
+        let obstacle = Obstacle::platform(5.0, 0.5, 0.0, 1.0, 1.0, 2.0);
+
+        let result = physics.resolve_horizontal_collision(&player, &vel_x, &obstacle, obstacle.kind.clone());
 
         assert_eq!(result, CollisionResult::None);
     }

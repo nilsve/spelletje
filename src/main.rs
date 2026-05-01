@@ -14,25 +14,12 @@ use spelletje_mac::world::World;
 #[cfg(feature = "gui")]
 use spelletje_mac::player::Player;
 #[cfg(feature = "gui")]
-use spelletje_mac::platform::Platform;
-
-use spelletje_mac::headless;
+use spelletje_mac::obstacle::Obstacle;
 
 #[cfg(feature = "gui")]
-fn get_game_input() -> Input {
-    Input {
-        left: is_key_down(KeyCode::A),
-        right: is_key_down(KeyCode::D),
-        jump: is_key_pressed(KeyCode::W),
-        forward: is_key_down(KeyCode::S),
-        backward: is_key_down(KeyCode::Space),
-    }
-}
-
-#[cfg(feature = "gui")]
-fn draw_platform(platform: &Platform, color: Color) {
-    let size = vec3(platform.width, platform.height, platform.depth);
-    let pos = vec3(platform.x, platform.y, platform.z);
+fn draw_obstacle(obstacle: &Obstacle, color: Color) {
+    let size = vec3(obstacle.width, obstacle.height, obstacle.depth);
+    let pos = vec3(obstacle.x, obstacle.y, obstacle.z);
     draw_cube(pos, size, None, color);
     draw_cube_wires(pos, size, DARKGRAY);
 }
@@ -41,9 +28,9 @@ fn draw_platform(platform: &Platform, color: Color) {
 async fn game_loop() {
     let mut world = World::new();
 
-    world.add_platform(Platform::new(0.0, -0.25, 0.0, 100.0, 0.5, 100.0));
-    world.add_platform(Platform::new(5.0, 1.5, 0.0, 4.0, 0.5, 4.0));
-    world.add_platform(Platform::new(-5.0, 2.5, 0.0, 3.0, 0.5, 3.0));
+    world.add_platform(0.0, -0.25, 0.0, 100.0, 0.5, 100.0);
+    world.add_platform(5.0, 1.5, 0.0, 4.0, 0.5, 4.0);
+    world.add_platform(-5.0, 2.5, 0.0, 3.0, 0.5, 3.0);
 
     let player = Player::new();
     world.add_entity(player);
@@ -59,7 +46,7 @@ async fn game_loop() {
 
         world.update_all(&input, &physics, dt);
 
-        let player_ref = world.entities.get(0).unwrap();
+        let player_ref = world.entities.first().unwrap();
 
         let screen_aspect = screen_width() / screen_height();
         let cam_height = 15.0;
@@ -84,8 +71,8 @@ async fn game_loop() {
             draw_line_3d(vec3(i as f32, 0.001, -20.0), vec3(i as f32, 0.001, 20.0), c);
         }
 
-        for platform in &world.platforms {
-            draw_platform(platform, GREEN);
+        for obstacle in &world.obstacles {
+            draw_obstacle(obstacle, GREEN);
         }
 
         for entity in &world.entities {
