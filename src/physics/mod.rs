@@ -13,6 +13,8 @@ pub enum CollisionResult {
     Right,
     /// Collided from the side moving left.
     Left,
+    /// Collided from the top moving up.
+    Top,
 }
 
 #[derive(Clone, Debug)]
@@ -135,10 +137,10 @@ impl Physics for PhysicsImpl {
                 return CollisionResult::None;
             }
 
-            if *vel_y < 0.0 && player.min_y() <= obstacle.max_y() {
+            if *vel_y < 0.0 && player.min_y() <= obstacle.max_y() && player.min_y() >= obstacle.max_y() - 0.5 {
                 CollisionResult::Bottom
-            } else if *vel_y > 0.0 && player.max_y() >= obstacle.min_y() && player.max_y() <= obstacle.max_y() {
-                CollisionResult::None
+            } else if *vel_y > 0.0 && player.max_y() >= obstacle.min_y() && player.max_y() <= obstacle.min_y() + 0.5 {
+                CollisionResult::Top
             } else {
                 CollisionResult::None
             }

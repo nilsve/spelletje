@@ -1,6 +1,8 @@
 /// Projectile system for the game.
 /// Projectiles are entities that move through the air and can collide with platforms and players.
 
+use crate::obstacle::Aabb;
+
 #[derive(Clone, Debug)]
 pub struct Projectile {
     pub x: f32,
@@ -14,9 +16,19 @@ pub struct Projectile {
     pub damage: f32,
 }
 
+impl Aabb for Projectile {
+    fn min_x(&self) -> f32 { self.x - 0.1 }
+    fn max_x(&self) -> f32 { self.x + 0.1 }
+    fn min_y(&self) -> f32 { self.y - 0.1 }
+    fn max_y(&self) -> f32 { self.y + 0.1 }
+    fn min_z(&self) -> f32 { self.z - 0.1 }
+    fn max_z(&self) -> f32 { self.z + 0.1 }
+}
+
 impl Projectile {
     pub fn new(x: f32, y: f32, z: f32, vel_x: f32, vel_y: f32, vel_z: f32, damage: f32) -> Self {
-        let max_lifetime = (vel_x.abs() + vel_y.abs() + vel_z.abs()).max(0.1) / 10.0;
+        let speed = (vel_x * vel_x + vel_y * vel_y + vel_z * vel_z).sqrt().max(0.1);
+        let max_lifetime = speed / 10.0;
         Self {
             x,
             y,

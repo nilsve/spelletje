@@ -40,6 +40,7 @@ fn keys_to_input(keys: &[char]) -> Input {
         jump: keys.contains(&'w'),
         forward: keys.contains(&'s'),
         backward: keys.contains(&' '),
+        shoot: keys.contains(&'f'),
     }
 }
 pub fn run_cli(input_str: &str) {
@@ -65,12 +66,19 @@ pub fn run_cli(input_str: &str) {
         };
         // Parse current frame input
         let input = keys_to_input(&current_keys);
+        
+        // Handle shooting
+        if input.shoot {
+            let projectile = world.entities[0].fire();
+            world.add_projectile(projectile);
+        }
+
         // Update world
         world.update_all(&input, &physics, 0.016);
         // Print debug info
         if frame_count % 20 == 0 {
-            println!("Frame {}: keys={:?} pos=({:.2}, {:.2}, {:.2})", 
-                frame_count, current_keys, world.entities[0].x, world.entities[0].y, world.entities[0].z);
+            println!("Frame {}: keys={:?} pos=({:.2}, {:.2}, {:.2}) projectiles={}", 
+                frame_count, current_keys, world.entities[0].x, world.entities[0].y, world.entities[0].z, world.projectile_count());
         }
         // Advance sequence based on elapsed time
         elapsed += 0.016;

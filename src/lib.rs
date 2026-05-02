@@ -5,3 +5,5 @@ pub mod world;
 pub mod input;
 pub mod projectile;
 pub mod headless;
+pub mod enemy;
+pub mod shooter;

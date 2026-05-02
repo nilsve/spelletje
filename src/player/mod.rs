@@ -1,6 +1,8 @@
 use crate::physics::{Physics, PhysicsConfig};
 use crate::input::Input;
 use crate::obstacle::Aabb;
+use crate::projectile::Projectile;
+use crate::shooter::Shooter;
 
 #[derive(Clone, Debug)]
 pub struct PlayerConfig {
@@ -49,6 +51,8 @@ pub struct Player {
     pub vel_z: f32,
     pub grounded: bool,
     pub config: PlayerConfig,
+    pub gun_angle: f32,
+    pub gun_pitch: f32,
 }
 
 impl Aabb for Player {
@@ -84,6 +88,8 @@ impl Player {
             vel_z: 0.0,
             grounded: true,
             config: PlayerConfig::default(),
+            gun_angle: 0.0,
+            gun_pitch: 0.0,
         }
     }
 
@@ -98,6 +104,8 @@ impl Player {
             vel_z: 0.0,
             grounded: true,
             config,
+            gun_angle: 0.0,
+            gun_pitch: 0.0,
         }
     }
 
@@ -107,6 +115,35 @@ impl Player {
 
     pub fn set_grounded(&mut self, grounded: bool) {
         self.grounded = grounded;
+    }
+
+    /// Returns the 3D position at the tip of the gun for rendering.
+    pub fn gun_end(&self) -> (f32, f32, f32) {
+        const GUN_LENGTH: f32 = 1.5;
+        let cos_pitch = f32::cos(self.gun_pitch);
+        let dir_x = f32::sin(self.gun_angle) * cos_pitch;
+        let dir_y = f32::sin(self.gun_pitch);
+        let dir_z = f32::cos(self.gun_angle) * cos_pitch;
+        (
+            self.x + dir_x * GUN_LENGTH,
+            self.y + self.size / 2.0 + dir_y * GUN_LENGTH,
+            self.z + dir_z * GUN_LENGTH,
+        )
+    }
+
+    /// Returns the normalized shoot direction vector based on gun angle and pitch.
+    pub fn shoot_direction(&self) -> (f32, f32, f32) {
+        let cos_pitch = f32::cos(self.gun_pitch);
+        let dir_x = f32::sin(self.gun_angle) * cos_pitch;
+        let dir_y = f32::sin(self.gun_pitch);
+        let dir_z = f32::cos(self.gun_angle) * cos_pitch;
+        let len = (dir_x * dir_x + dir_y * dir_y + dir_z * dir_z).sqrt();
+        (dir_x / len, dir_y / len, dir_z / len)
+    }
+
+    /// Creates a projectile fired from the gun tip in the current aim direction.
+    pub fn fire(&self) -> Projectile {
+        self.fire_with_direction(self.shoot_direction())
     }
 
     pub fn update(&mut self, input: &Input, physics: &dyn Physics, dt: f32) {
@@ -170,9 +207,35 @@ impl Player {
     }
 }
 
+impl Shooter for Player {
+    fn shoot_origin(&self) -> (f32, f32, f32) {
+        self.gun_end()
+    }
+
+    fn projectile_speed(&self) -> f32 {
+        15.0
+    }
+
+    fn damage(&self) -> f32 {
+        10.0
+    }
+}
+
 impl Default for Player {
     fn default() -> Self {
-        Self::new()
+        Self {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+            size: 1.0,
+            vel_x: 0.0,
+            vel_y: 0.0,
+            vel_z: 0.0,
+            config: PlayerConfig::default(),
+            gun_angle: 0.0,
+            gun_pitch: 0.0,
+            grounded: false,
+        }
     }
 }
 
@@ -188,6 +251,7 @@ mod tests {
             jump: false,
             forward: false,
             backward: false,
+            shoot: false,
         }
     }
 
@@ -198,6 +262,7 @@ mod tests {
             jump: true,
             forward: false,
             backward: false,
+            shoot: false,
         }
     }
 
@@ -286,7 +351,7 @@ mod tests {
     #[test]
     fn test_max_speed_is_enforced() {
         let mut player = Player::new();
-        let mut input = Input {
+        let input = Input {
             right: true,
             ..default_input()
         };
@@ -346,7 +411,7 @@ mod tests {
     #[test]
     fn test_gravity_affects_vertical_position() {
         let mut player = Player::new();
-        let mut jump_input = grounded_input();
+        let jump_input = grounded_input();
         let physics = PhysicsImpl::new();
 
         // Jump
@@ -389,5 +454,110 @@ mod tests {
 
         assert!(player.vel_x < 10.0);
         assert!(player.vel_x > 0.0);
+    }
+
+    #[test]
+    fn test_gun_angle_default_is_zero() {
+        let player = Player::new();
+        assert!((player.gun_angle - 0.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_gun_end_points_forward_by_default() {
+        let player = Player::new();
+        let end = player.gun_end();
+        // With gun_angle=0, should point in +Z direction
+        assert!((end.0 - player.x).abs() < 0.01);
+        assert!(end.2 > player.z);
+        assert!((end.1 - (player.y + player.size / 2.0)).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_gun_end_points_right_at_pi_over_2() {
+        let player = Player::new();
+        let mut p = player;
+        p.gun_angle = std::f32::consts::FRAC_PI_2;
+        let end = p.gun_end();
+        assert!(end.0 > p.x);
+        assert!((end.2 - p.z).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_gun_end_points_left_at_minus_pi_over_2() {
+        let player = Player::new();
+        let mut p = player;
+        p.gun_angle = -std::f32::consts::FRAC_PI_2;
+        let end = p.gun_end();
+        assert!(end.0 < p.x);
+        assert!((end.2 - p.z).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_shoot_direction_normalized() {
+        let player = Player::new();
+        let dir = player.shoot_direction();
+        let len = (dir.0 * dir.0 + dir.1 * dir.1 + dir.2 * dir.2).sqrt();
+        assert!((len - 1.0).abs() < 0.01);
+        // With default gun_pitch=0, dir_y is 0 (horizontal)
+        assert!((dir.1 - 0.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_shoot_direction_with_positive_pitch() {
+        let mut player = Player::new();
+        player.gun_pitch = 0.3;
+        let dir = player.shoot_direction();
+        assert!(dir.1 > 0.0);
+    }
+
+    #[test]
+    fn test_shoot_direction_with_negative_pitch() {
+        let mut player = Player::new();
+        player.gun_pitch = -0.3;
+        let dir = player.shoot_direction();
+        assert!(dir.1 < 0.0);
+    }
+
+    #[test]
+    fn test_shoot_direction_matches_gun_angle() {
+        let player = Player::new();
+        let mut p = player;
+        p.gun_angle = std::f32::consts::FRAC_PI_4;
+        let dir = p.shoot_direction();
+        assert!(dir.0 > 0.0);
+        assert!(dir.2 > 0.0);
+    }
+
+    #[test]
+    fn test_fire_creates_projectile() {
+        let player = Player::new();
+        let projectile = player.fire();
+        assert!(projectile.is_alive());
+        assert!((projectile.damage - 10.0).abs() < 0.1);
+        // Projectile starts at gun tip
+        let gun_end = player.gun_end();
+        assert!((projectile.x - gun_end.0).abs() < 0.01);
+        assert!((projectile.y - gun_end.1).abs() < 0.01);
+        assert!((projectile.z - gun_end.2).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_fire_projectile_has_velocity() {
+        let player = Player::new();
+        let projectile = player.fire();
+        let total_vel = (projectile.vel_x * projectile.vel_x
+            + projectile.vel_y * projectile.vel_y
+            + projectile.vel_z * projectile.vel_z).sqrt();
+        assert!((total_vel - 15.0).abs() < 0.1);
+    }
+
+    #[test]
+    fn test_fire_projectile_aims_correctly() {
+        let player = Player::new();
+        let mut p = player;
+        p.gun_angle = std::f32::consts::FRAC_PI_2; // point right
+        let projectile = p.fire();
+        assert!(projectile.vel_x > 10.0);
+        assert!(projectile.vel_z.abs() < 1.0);
     }
 }

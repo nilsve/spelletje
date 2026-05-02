@@ -7,6 +7,7 @@ pub struct Input {
     pub jump: bool,
     pub forward: bool,
     pub backward: bool,
+    pub shoot: bool,
 }
 
 /// Reads hardware input and produces an Input state.
@@ -28,6 +29,7 @@ impl InputSource for MacroquadInput {
             jump: is_key_pressed(KeyCode::W),
             forward: is_key_down(KeyCode::S),
             backward: is_key_down(KeyCode::Space),
+            shoot: is_mouse_button_pressed(MouseButton::Left),
         }
     }
 }
@@ -44,6 +46,7 @@ mod tests {
         assert!(!input.jump);
         assert!(!input.forward);
         assert!(!input.backward);
+        assert!(!input.shoot);
     }
 
     #[test]
@@ -54,11 +57,13 @@ mod tests {
             jump: true,
             forward: false,
             backward: false,
+            shoot: true,
         };
         let cloned = input.clone();
         assert!(cloned.left);
         assert!(!cloned.right);
         assert!(cloned.jump);
+        assert!(cloned.shoot);
     }
 
     #[test]
