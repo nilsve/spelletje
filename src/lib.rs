@@ -1,4 +1,5 @@
 pub mod physics;
+pub use physics::PositionUpdate;
 pub mod player;
 pub mod obstacle;
 pub mod world;

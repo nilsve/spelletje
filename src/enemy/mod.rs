@@ -3,7 +3,7 @@
 use crate::player::Player;
 use crate::obstacle::Aabb;
 use crate::projectile::Projectile;
-use crate::physics::PhysicsConfig;
+use crate::physics::{PhysicsConfig, PositionUpdate};
 use crate::shooter::Shooter;
 
 #[derive(Clone, Debug)]
@@ -187,9 +187,7 @@ impl Enemy {
         }
 
         // Update position
-        self.x += self.vel_x * dt;
-        self.y += self.vel_y * dt;
-        self.z += self.vel_z * dt;
+        self.update_position(dt);
 
         // Shooting timer
         self.shoot_timer += dt;
@@ -226,6 +224,14 @@ impl Enemy {
 
     pub fn to_physics_config(&self) -> PhysicsConfig {
         self.config.to_physics_config()
+    }
+}
+
+impl PositionUpdate for Enemy {
+    fn update_position(&mut self, dt: f32) {
+        self.x += self.vel_x * dt;
+        self.y += self.vel_y * dt;
+        self.z += self.vel_z * dt;
     }
 }
 

@@ -1,4 +1,4 @@
-use crate::physics::{Physics, PhysicsConfig};
+use crate::physics::{Physics, PhysicsConfig, PositionUpdate};
 use crate::input::Input;
 use crate::obstacle::Aabb;
 use crate::projectile::Projectile;
@@ -170,18 +170,18 @@ impl Player {
 
         // If moving upward, not grounded
         if self.vel_y > 0.0 {
-            self.grounded = false;
+            self.set_grounded(false);
         }
 
         // Ground collision (before jump so grounded check works after gravity)
         if self.y <= self.config.friction_threshold && self.vel_y == 0.0 && !input.jump {
-            self.grounded = true;
+            self.set_grounded(true);
         }
 
         // Jump (Y axis)
-        if input.jump && self.grounded {
+        if input.jump && self.is_grounded() {
             physics.apply_jump(&mut self.vel_y, &pc);
-            self.grounded = false;
+            self.set_grounded(false);
         }
 
         // Depth input (Z axis)
@@ -196,14 +196,11 @@ impl Player {
             physics.apply_friction(&mut self.vel_z, dt, &pc);
         }
 
-        // Update positions
-        self.x += self.vel_x * dt;
-        self.y += self.vel_y * dt;
-        self.z += self.vel_z * dt;
-
         // Clamp speed
         physics.clamp_speed(&mut self.vel_x, &pc);
         physics.clamp_speed(&mut self.vel_z, &pc);
+
+        self.update_position(dt);
     }
 }
 
@@ -218,6 +215,14 @@ impl Shooter for Player {
 
     fn damage(&self) -> f32 {
         10.0
+    }
+}
+
+impl PositionUpdate for Player {
+    fn update_position(&mut self, dt: f32) {
+        self.x += self.vel_x * dt;
+        self.y += self.vel_y * dt;
+        self.z += self.vel_z * dt;
     }
 }
 

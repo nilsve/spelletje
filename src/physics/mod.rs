@@ -40,6 +40,10 @@ impl Default for PhysicsConfig {
     }
 }
 
+pub trait PositionUpdate {
+    fn update_position(&mut self, dt: f32);
+}
+
 pub trait Physics {
     fn apply_gravity(&self, vel_y: &mut f32, dt: f32, config: &PhysicsConfig);
     fn apply_jump(&self, vel_y: &mut f32, config: &PhysicsConfig);

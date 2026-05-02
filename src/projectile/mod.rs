@@ -2,6 +2,7 @@
 /// Projectiles are entities that move through the air and can collide with platforms and players.
 
 use crate::obstacle::Aabb;
+use crate::physics::PositionUpdate;
 
 #[derive(Clone, Debug)]
 pub struct Projectile {
@@ -51,9 +52,7 @@ impl Projectile {
             return;
         }
         self.lifetime += dt;
-        self.x += self.vel_x * dt;
-        self.y += self.vel_y * dt;
-        self.z += self.vel_z * dt;
+        self.update_position(dt);
     }
 
     /// Check if projectile collides with a platform.
@@ -130,6 +129,14 @@ impl Projectile {
         }
 
         true
+    }
+}
+
+impl PositionUpdate for Projectile {
+    fn update_position(&mut self, dt: f32) {
+        self.x += self.vel_x * dt;
+        self.y += self.vel_y * dt;
+        self.z += self.vel_z * dt;
     }
 }
 
