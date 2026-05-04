@@ -1,5 +1,6 @@
+use crate::PhysicsEntity;
 use crate::input::Input;
-use crate::physics::PhysicsImpl;
+use crate::physics::Physics;
 use crate::player::Player;
 use crate::world::World;
 /// Parse an input string like "a3w3d2" into a list of (char, seconds).
@@ -51,19 +52,20 @@ pub fn run_cli(input_str: &str) {
     let mut world = World::new();
     world.add_entity(Player::default());
     world.add_platform(0.0, -0.25, 0.0, 100.0, 0.5, 100.0);
-    let physics = PhysicsImpl::new();
+    let physics = Physics::new();
     println!("Running CLI simulation with input: {}", input_str);
     println!("Sequence: {:?}", sequence);
     let initial = &world.entities[0];
+    let physics_data = initial.physics_data();
     println!(
         "{{\"x\":{:.2},\"y\":{:.2},\"z\":{:.2},\"vel_x\":{:.2},\"vel_y\":{:.2},\"vel_z\":{:.2},\"grounded\":{}}}",
-        initial.physics_data.x,
-        initial.physics_data.y,
-        initial.physics_data.z,
-        initial.physics_data.vel_x,
-        initial.physics_data.vel_y,
-        initial.physics_data.vel_z,
-        initial.physics_data.is_grounded
+        physics_data.x,
+        physics_data.y,
+        physics_data.z,
+        physics_data.vel_x,
+        physics_data.vel_y,
+        physics_data.vel_z,
+        physics_data.is_grounded
     );
     loop {
         // Get current keys from sequence
@@ -89,9 +91,9 @@ pub fn run_cli(input_str: &str) {
                 "Frame {}: keys={:?} pos=({:.2}, {:.2}, {:.2}) projectiles={}",
                 frame_count,
                 current_keys,
-                world.entities[0].physics_data.x,
-                world.entities[0].physics_data.y,
-                world.entities[0].physics_data.z,
+                world.entities[0].physics_data().x,
+                world.entities[0].physics_data().y,
+                world.entities[0].physics_data().z,
                 world.projectile_count()
             );
         }
@@ -105,9 +107,9 @@ pub fn run_cli(input_str: &str) {
         if seq_idx >= sequence.len() {
             println!(
                 "Simulation complete. Final position: ({:.2}, {:.2}, {:.2})",
-                world.entities[0].physics_data.x,
-                world.entities[0].physics_data.y,
-                world.entities[0].physics_data.z
+                world.entities[0].physics_data().x,
+                world.entities[0].physics_data().y,
+                world.entities[0].physics_data().z
             );
             break;
         }

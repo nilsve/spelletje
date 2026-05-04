@@ -1,4 +1,4 @@
-use crate::PhysicsImpl;
+use crate::Physics;
 use crate::obstacle::Aabb;
 use crate::physics::{EntityPhysicsData, GlobalPhysicsConfig, PhysicsEntity};
 /// Enemy system: autonomous enemies that chase and shoot at the player.
@@ -78,18 +78,18 @@ impl Enemy {
     }
 
     /// Updates enemy AI: movement toward player and shooting.
-    pub fn update_ai(&mut self, player: &Player, dt: f32, physics: &PhysicsImpl) {
+    pub fn update_ai(&mut self, player: &Player, dt: f32, physics: &Physics) {
         if !self.alive {
             return;
         }
 
-        let dx = player.physics_data.x - self.physics_data.x;
-        let dy = player.physics_data.y - self.physics_data.y;
+        let dx = player.physics_data().x - self.physics_data.x;
+        let dy = player.physics_data().y - self.physics_data.y;
         let dist = (dx * dx + dy * dy).sqrt();
 
         // Movement toward player
         if dx.abs() > 2.0 && dx.abs() < self.detection_range {
-            let target_x = player.physics_data.x;
+            let target_x = player.physics_data().x;
             let move_dx = target_x - self.physics_data.x;
             let move_len = (move_dx * move_dx).sqrt().max(0.01);
             let normalized_dx = move_dx / move_len;
@@ -113,9 +113,6 @@ impl Enemy {
 
         physics.apply_gravity(&mut self.physics_data_mut().vel_y, dt);
 
-        // Update position
-        self.update_position(dt);
-
         // // Shooting timer
         self.shoot_timer += dt;
         if self.shoot_timer >= self.shoot_interval && dist < self.shoot_range {
@@ -129,17 +126,17 @@ impl Enemy {
             return None;
         }
 
-        let dx = player.physics_data.x - self.physics_data.x;
-        let dy = player.physics_data.y + player.physics_data.size / 2.0
+        let dx = player.physics_data().x - self.physics_data.x;
+        let dy = player.physics_data().y + player.physics_data().size / 2.0
             - (self.physics_data.y + self.physics_data.size / 2.0);
-        let dz = player.physics_data.z - self.physics_data.z;
+        let dz = player.physics_data().z - self.physics_data.z;
         let dist = (dx * dx + dy * dy + dz * dz).sqrt();
 
         if self.shoot_timer >= self.shoot_interval && dist < self.shoot_range {
             Some(self.shoot_at(
-                player.physics_data.x,
-                player.physics_data.y + player.physics_data.size / 2.0,
-                player.physics_data.z,
+                player.physics_data().x,
+                player.physics_data().y + player.physics_data().size / 2.0,
+                player.physics_data().z,
             ))
         } else {
             None

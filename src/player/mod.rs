@@ -1,13 +1,13 @@
 use crate::input::Input;
 use crate::obstacle::Aabb;
-use crate::physics::{EntityPhysicsData, GlobalPhysicsConfig, PhysicsEntity, PhysicsImpl};
+use crate::physics::{EntityPhysicsData, GlobalPhysicsConfig, Physics, PhysicsEntity};
 use crate::projectile::Projectile;
 use crate::shooter::Shooter;
 
 #[derive(Clone, Debug)]
 pub struct Player {
     pub jump_force: f32,
-    pub physics_data: EntityPhysicsData,
+    physics_data: EntityPhysicsData,
     pub gun_angle: f32,
     pub gun_pitch: f32,
 }
@@ -34,29 +34,8 @@ impl Aabb for Player {
 }
 
 impl Player {
-    pub fn with_physics_config(physics_data: EntityPhysicsData) -> Self {
-        Self {
-            physics_data,
-            jump_force: 10.0,
-            gun_angle: 0.0,
-            gun_pitch: 0.0,
-        }
-    }
-
     pub fn is_grounded(&self) -> bool {
         self.physics_data().is_grounded
-    }
-
-    pub fn pos(&self) -> (f32, f32, f32) {
-        (
-            self.physics_data.x,
-            self.physics_data.y,
-            self.physics_data.z,
-        )
-    }
-
-    pub fn size(&self) -> f32 {
-        self.physics_data.size
     }
 
     /// Returns the 3D position at the tip of the gun for rendering.
@@ -88,7 +67,7 @@ impl Player {
         self.fire_with_direction(self.shoot_direction())
     }
 
-    pub fn update(&mut self, input: &Input, physics: &PhysicsImpl, dt: f32) {
+    pub fn update(&mut self, input: &Input, physics: &Physics, dt: f32) {
         let mut input_x = 0.0;
         if input.left {
             input_x -= 1.0;
@@ -110,8 +89,6 @@ impl Player {
         }
 
         physics.clamp_speed(&mut self.physics_data.vel_x);
-
-        self.update_position(dt);
     }
 }
 
@@ -155,7 +132,7 @@ impl Default for Player {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::physics::PhysicsImpl;
+    use crate::physics::Physics;
 
     fn default_input() -> Input {
         Input {
@@ -210,7 +187,7 @@ mod tests {
             right: true,
             ..default_input()
         };
-        let physics = PhysicsImpl::new();
+        let physics = Physics::new();
         let dt = 0.016;
 
         player.update(&input, &physics, dt);
@@ -223,7 +200,7 @@ mod tests {
         let mut player = Player::default();
         player.physics_data.vel_x = 5.0;
         let input = default_input();
-        let physics = PhysicsImpl::new();
+        let physics = Physics::new();
 
         // Update many frames until velocity should reach zero
         for _ in 0..100 {
@@ -237,7 +214,7 @@ mod tests {
     fn test_jump_sets_vertical_velocity() {
         let mut player = Player::default();
         assert!(player.is_grounded());
-        let physics = PhysicsImpl::new();
+        let physics = Physics::new();
 
         player.update(&grounded_input(), &physics, 0.016);
 
@@ -251,7 +228,7 @@ mod tests {
         player.physics_data.is_grounded = false;
         assert!(!player.is_grounded());
 
-        let physics = PhysicsImpl::new();
+        let physics = Physics::new();
         let initial_vel_y = player.physics_data.vel_y;
 
         player.update(&grounded_input(), &physics, 0.016);
@@ -268,7 +245,7 @@ mod tests {
             right: true,
             ..default_input()
         };
-        let physics = PhysicsImpl::new();
+        let physics = Physics::new();
 
         // Accelerate for many frames
         for _ in 0..100 {
@@ -285,7 +262,7 @@ mod tests {
             left: true,
             ..default_input()
         };
-        let physics = PhysicsImpl::new();
+        let physics = Physics::new();
         let dt = 0.016;
 
         player.update(&input, &physics, dt);
@@ -300,7 +277,7 @@ mod tests {
             backward: true,
             ..default_input()
         };
-        let physics = PhysicsImpl::new();
+        let physics = Physics::new();
         let dt = 0.016;
 
         player.update(&input, &physics, dt);
@@ -313,7 +290,7 @@ mod tests {
         let mut player = Player::default();
         player.physics_data.vel_x = 5.0;
         let input = default_input();
-        let physics = PhysicsImpl::new();
+        let physics = Physics::new();
         let dt = 0.016;
 
         player.update(&input, &physics, dt);
@@ -325,7 +302,7 @@ mod tests {
     fn test_gravity_affects_vertical_position() {
         let mut player = Player::default();
         let jump_input = grounded_input();
-        let physics = PhysicsImpl::new();
+        let physics = Physics::new();
 
         // Jump
         player.update(&jump_input, &physics, 0.016);
@@ -347,7 +324,7 @@ mod tests {
 
         player.jump_force = 20.0;
 
-        let physics = PhysicsImpl::new();
+        let physics = Physics::new();
 
         player.update(&grounded_input(), &physics, 0.016);
 
@@ -359,7 +336,7 @@ mod tests {
         let mut player = Player::default();
         player.physics_data.vel_x = 10.0;
         let input = default_input();
-        let physics = PhysicsImpl::new();
+        let physics = Physics::new();
 
         player.update(&input, &physics, 0.016);
 

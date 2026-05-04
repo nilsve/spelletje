@@ -54,6 +54,16 @@ pub struct EntityPhysicsData {
     pub is_grounded: bool,
 }
 
+impl EntityPhysicsData {
+    pub fn pos(&self) -> (f32, f32, f32) {
+        (self.x, self.y, self.z)
+    }
+
+    pub fn size(&self) -> f32 {
+        self.size
+    }
+}
+
 impl Default for EntityPhysicsData {
     fn default() -> Self {
         Self {
@@ -81,11 +91,11 @@ pub trait PhysicsEntity {
 }
 
 /// Physics engine: wraps configuration and provides physics calculations.
-pub struct PhysicsImpl {
+pub struct Physics {
     config: GlobalPhysicsConfig,
 }
 
-impl Default for PhysicsImpl {
+impl Default for Physics {
     fn default() -> Self {
         Self {
             config: GlobalPhysicsConfig::default(),
@@ -93,7 +103,7 @@ impl Default for PhysicsImpl {
     }
 }
 
-impl PhysicsImpl {
+impl Physics {
     pub fn new() -> Self {
         Self::default()
     }
@@ -316,7 +326,7 @@ mod tests {
 
     #[test]
     fn test_gravity_decreases_vertical_velocity() {
-        let physics = PhysicsImpl::new();
+        let physics = Physics::new();
         let mut vel_y = 0.0;
         let dt = 0.016;
 
@@ -327,7 +337,7 @@ mod tests {
 
     #[test]
     fn test_jump_sets_vertical_velocity() {
-        let physics = PhysicsImpl::new();
+        let physics = Physics::new();
         let mut vel_y = 0.0;
 
         physics.apply_jump(&mut vel_y);
@@ -337,7 +347,7 @@ mod tests {
 
     #[test]
     fn test_friction_reduces_velocity() {
-        let physics = PhysicsImpl::new();
+        let physics = Physics::new();
         let mut vel_x = 5.0;
         let dt = 0.016;
 
@@ -349,7 +359,7 @@ mod tests {
 
     #[test]
     fn test_friction_stops_velocity_below_threshold() {
-        let physics = PhysicsImpl::new();
+        let physics = Physics::new();
         let mut vel_x = 0.005;
         let dt = 0.016;
 
@@ -360,7 +370,7 @@ mod tests {
 
     #[test]
     fn test_clamp_speed_reduces_velocity_above_max() {
-        let physics = PhysicsImpl::new();
+        let physics = Physics::new();
         let mut vel_x = -10.0;
 
         physics.clamp_speed(&mut vel_x);
@@ -370,7 +380,7 @@ mod tests {
 
     #[test]
     fn test_clamp_speed_no_change_when_below_max() {
-        let physics = PhysicsImpl::new();
+        let physics = Physics::new();
         let mut vel_x = 3.0;
 
         let original = vel_x;
@@ -381,7 +391,7 @@ mod tests {
 
     #[test]
     fn test_acceleration_increases_velocity() {
-        let physics = PhysicsImpl::new();
+        let physics = Physics::new();
         let mut vel_x = 0.0;
         let input = 1.0;
         let dt = 0.016;
@@ -393,7 +403,7 @@ mod tests {
 
     #[test]
     fn test_acceleration_with_negative_input() {
-        let physics = PhysicsImpl::new();
+        let physics = Physics::new();
         let mut vel_x = 0.0;
         let input = -1.0;
         let dt = 0.016;
@@ -405,7 +415,7 @@ mod tests {
 
     #[test]
     fn test_resolve_platform_collision_bottom() {
-        let physics = PhysicsImpl::new();
+        let physics = Physics::new();
         let player = TestPlayer::new(1.0, 1.0);
         let vel_y = -2.0;
         let obstacle = Obstacle::solid(0.0, 1.05, 0.0, 4.0, 0.1, 4.0);
@@ -418,7 +428,7 @@ mod tests {
 
     #[test]
     fn test_resolve_platform_collision_no_collision() {
-        let physics = PhysicsImpl::new();
+        let physics = Physics::new();
         let player = TestPlayer::new(10.0, 1.0);
         let vel_y = -2.0;
         let obstacle = Obstacle::solid(0.0, 1.05, 0.0, 4.0, 0.1, 4.0);
@@ -431,7 +441,7 @@ mod tests {
 
     #[test]
     fn test_resolve_platform_collision_top() {
-        let physics = PhysicsImpl::new();
+        let physics = Physics::new();
         let player = TestPlayer::new(1.5, 1.0);
         let vel_y = 2.0;
         let obstacle = Obstacle::solid(0.0, 2.55, 0.0, 4.0, 0.1, 4.0);
@@ -444,7 +454,7 @@ mod tests {
 
     #[test]
     fn test_resolve_platform_collision_no_overlap_x() {
-        let physics = PhysicsImpl::new();
+        let physics = Physics::new();
         let player = TestPlayer::new(1.0, 1.0);
         let vel_y = -2.0;
         let obstacle = Obstacle::solid(10.0, 1.05, 0.0, 4.0, 0.1, 4.0);
@@ -457,7 +467,7 @@ mod tests {
 
     #[test]
     fn test_resolve_platform_collision_no_overlap_z() {
-        let physics = PhysicsImpl::new();
+        let physics = Physics::new();
         let player = TestPlayer::new(1.0, 1.0);
         let vel_y = -2.0;
         let obstacle = Obstacle::solid(0.0, 1.05, 10.0, 4.0, 0.1, 4.0);
@@ -470,7 +480,7 @@ mod tests {
 
     #[test]
     fn test_resolve_horizontal_collision_right() {
-        let physics = PhysicsImpl::new();
+        let physics = Physics::new();
         let player = TestPlayer::new_at(-0.6, 0.5, 0.0, 1.0);
         let vel_x = 1.0;
         let obstacle = Obstacle::solid(0.0, 0.5, 0.0, 1.0, 1.0, 2.0);
@@ -483,7 +493,7 @@ mod tests {
 
     #[test]
     fn test_resolve_horizontal_collision_left() {
-        let physics = PhysicsImpl::new();
+        let physics = Physics::new();
         let player = TestPlayer::new_at(0.6, 0.5, 0.0, 1.0);
         let vel_x = -1.0;
         let obstacle = Obstacle::solid(0.0, 0.5, 0.0, 1.0, 1.0, 2.0);
@@ -496,7 +506,7 @@ mod tests {
 
     #[test]
     fn test_resolve_horizontal_collision_no_collision() {
-        let physics = PhysicsImpl::new();
+        let physics = Physics::new();
         let player = TestPlayer::new_at(4.6, 0.5, 0.0, 1.0);
         let vel_x = 1.0;
         let obstacle = Obstacle::solid(5.0, 0.5, 0.0, 1.0, 1.0, 2.0);
@@ -509,7 +519,7 @@ mod tests {
 
     #[test]
     fn test_resolve_horizontal_collision_no_overlap_y() {
-        let physics = PhysicsImpl::new();
+        let physics = Physics::new();
         let player = TestPlayer::new_at(0.5, 2.0, 0.0, 1.0);
         let vel_x = 1.0;
         let obstacle = Obstacle::solid(0.0, 0.5, 0.0, 1.0, 1.0, 2.0);
@@ -522,7 +532,7 @@ mod tests {
 
     #[test]
     fn test_platform_collision_no_landing_when_falling_from_far() {
-        let physics = PhysicsImpl::new();
+        let physics = Physics::new();
         let player = TestPlayer::new(4.0, 1.0);
         let vel_y = -2.0;
         let obstacle = Obstacle::solid(0.0, 2.05, 0.0, 4.0, 0.1, 4.0);

@@ -1,24 +1,25 @@
 #[cfg(feature = "gui")]
-use macroquad::prelude::*;
+use macroquad::camera::Projection;
 #[cfg(feature = "gui")]
 use macroquad::camera::{Camera3D, set_camera, set_default_camera};
 #[cfg(feature = "gui")]
-use macroquad::camera::Projection;
+use macroquad::prelude::*;
 
+use spelletje_mac::PhysicsEntity;
 #[cfg(feature = "gui")]
-use spelletje_mac::physics::PhysicsImpl;
+use spelletje_mac::enemy::Enemy;
 #[cfg(feature = "gui")]
 use spelletje_mac::input::{InputSource, MacroquadInput};
 #[cfg(feature = "gui")]
-use spelletje_mac::world::World;
+use spelletje_mac::obstacle::Obstacle;
+#[cfg(feature = "gui")]
+use spelletje_mac::physics::Physics;
 #[cfg(feature = "gui")]
 use spelletje_mac::player::Player;
 #[cfg(feature = "gui")]
-use spelletje_mac::obstacle::Obstacle;
-#[cfg(feature = "gui")]
 use spelletje_mac::projectile::Projectile;
 #[cfg(feature = "gui")]
-use spelletje_mac::enemy::{Enemy};
+use spelletje_mac::world::World;
 
 #[cfg(feature = "gui")]
 fn draw_obstacle(obstacle: &Obstacle, color: Color) {
@@ -31,15 +32,19 @@ fn draw_obstacle(obstacle: &Obstacle, color: Color) {
 #[cfg(feature = "gui")]
 fn draw_projectile(projectile: &Projectile) {
     let size = vec3(0.15, 0.15, 0.15);
-    let pos = vec3(projectile.position().0, projectile.position().1, projectile.position().2);
+    let pos = vec3(
+        projectile.position().0,
+        projectile.position().1,
+        projectile.position().2,
+    );
     draw_cube(pos, size, None, YELLOW);
     draw_cube_wires(pos, size, ORANGE);
 }
 
 #[cfg(feature = "gui")]
 fn draw_gun(player: &Player) {
-    let pos = player.pos();
-    let gun_start = vec3(pos.0, pos.1 + player.size() / 2.0, pos.2);
+    let pos = player.physics_data().pos();
+    let gun_start = vec3(pos.0, pos.1 + player.physics_data().size() / 2.0, pos.2);
     let gun_end = player.gun_end();
     let gun_pos = vec3(gun_end.0, gun_end.1, gun_end.2);
     draw_line_3d(gun_start, gun_pos, WHITE);
@@ -66,9 +71,10 @@ fn draw_enemy(enemy: &Enemy) {
 async fn game_loop() {
     let mut world = World::new();
 
+    // world.add_obstacle(Obstacle::solid(5.0, 0., 0.0, 5.0, 5., 100.0));
     world.add_platform(0.0, -0.25, 0.0, 100.0, 0.5, 100.0);
-    world.add_obstacle(Obstacle::solid(5.0, 1.5, 0.0, 4.0, 0.5, 4.0));
-    world.add_obstacle(Obstacle::solid(-5.0, 2.5, 0.0, 3.0, 0.5, 3.0));
+    world.add_obstacle(Obstacle::solid(5.0, 1.5, 0.0, 4.0, 1., 100.0));
+    world.add_platform(-5.0, 2.5, 0.0, 3.0, 0.5, 3.0);
 
     let player = Player::default();
     world.add_entity(player);
@@ -77,22 +83,27 @@ async fn game_loop() {
     world.add_enemy(Enemy::default());
     world.enemies[0].physics_data.x = 10.0;
     world.enemies[0].physics_data.z = 5.0;
-    
+
     let mut enemy2 = Enemy::default();
     enemy2.physics_data.x = -8.0;
-    enemy2.physics_data.z = 8.0;
+    enemy2.physics_data.z = 0.0;
     enemy2.health = 80.0;
     enemy2.damage = 15.0;
     enemy2.shoot_interval = 1.5;
     world.add_enemy(enemy2);
 
-    let physics = PhysicsImpl::new();
+    let physics = Physics::new();
     let input_source = MacroquadInput;
+
+    let mut camera_yaw = 0.0f32;
+    let mut camera_pitch = 0.0f32;
+    let mut is_panning = false;
+    let mut last_mouse_pos = (0.0f32, 0.0f32);
 
     loop {
         clear_background(BLACK);
 
-        let dt = get_frame_time();
+        let dt = get_frame_time().min(1. * 0.1); // Max 0.3 seconds
 
         // Mouse aiming: map mouse X/Y to gun angle and pitch
         let (mx, my) = mouse_position();
@@ -102,7 +113,25 @@ async fn game_loop() {
             world.entities[0].gun_pitch = (0.5 - my / sh) * std::f32::consts::PI;
         }
 
-        let mut input = input_source.read();
+        // Camera rotation with right mouse button
+        let right_pressed = is_mouse_button_down(MouseButton::Right);
+        if right_pressed && !is_panning {
+            is_panning = true;
+            last_mouse_pos = mouse_position();
+        } else if !right_pressed && is_panning {
+            is_panning = false;
+        }
+
+        if is_panning {
+            let (cx, cy) = mouse_position();
+            let (dx, dy) = (cx - last_mouse_pos.0, cy - last_mouse_pos.1);
+            camera_yaw += dx * 0.005;
+            camera_pitch -= dy * 0.003;
+            camera_pitch = camera_pitch.max(-1.2).min(1.2);
+            last_mouse_pos = (cx, cy);
+        }
+
+        let input = input_source.read();
 
         // Handle shooting
         if is_mouse_button_pressed(MouseButton::Left) {
@@ -113,14 +142,23 @@ async fn game_loop() {
         world.update_all(&input, &physics, dt);
 
         let player_ref = world.entities.first().unwrap();
-        let p = player_ref.pos();
-        let s = player_ref.size();
+        let p = player_ref.physics_data().pos();
+        let s = player_ref.physics_data().size();
 
         let screen_aspect = sw / screen_height();
         let cam_height = 15.0;
         let cam_target = vec3(p.0, p.1 + s / 2.0, p.2);
+
+        // Apply camera rotation
+        let cos_yaw = camera_yaw.cos();
+        let sin_yaw = camera_yaw.sin();
+        let cam_dist = cam_height;
+        let cam_x = cam_target.x + sin_yaw * cam_dist;
+        let cam_z = cam_target.z + cos_yaw * cam_dist;
+        let cam_y = cam_target.y + camera_pitch.sin().abs() * cam_dist * 0.5;
+
         let camera = Camera3D {
-            position: vec3(cam_target.x, cam_target.y, cam_target.z + cam_height),
+            position: vec3(cam_x, cam_y, cam_z),
             target: cam_target,
             up: vec3(0.0, 1.0, 0.0),
             fovy: 10.0,
@@ -144,8 +182,8 @@ async fn game_loop() {
         }
 
         for entity in &world.entities {
-            let s = entity.size();
-            let e = entity.pos();
+            let s = entity.physics_data().size();
+            let e = entity.physics_data().pos();
             let size = vec3(s, s, s * 0.5);
             let pos = vec3(e.0, e.1 + s / 2.0, e.2);
             draw_cube(pos, size, None, BLUE);
@@ -165,18 +203,33 @@ async fn game_loop() {
         }
 
         set_default_camera();
-        draw_text("A/D to move | W to jump | S to move depth | Mouse to aim | Click to shoot", 10.0, 30.0, 20.0, WHITE);
+        draw_text(
+            "A/D to move | W to jump | S to move depth | Mouse to aim | Click to shoot",
+            10.0,
+            30.0,
+            20.0,
+            WHITE,
+        );
         draw_text(
             &format!("X: {:.1}  Y: {:.1}  Z: {:.1}", p.0, p.1, p.2),
-            10.0, 55.0, 20.0, YELLOW,
+            10.0,
+            55.0,
+            20.0,
+            YELLOW,
         );
         draw_text(
             &format!("Projectiles: {}", world.projectile_count()),
-            10.0, 80.0, 20.0, YELLOW,
+            10.0,
+            80.0,
+            20.0,
+            YELLOW,
         );
         draw_text(
             &format!("Enemies: {}", world.enemy_count()),
-            10.0, 105.0, 20.0, YELLOW,
+            10.0,
+            105.0,
+            20.0,
+            YELLOW,
         );
 
         next_frame().await;

@@ -64,7 +64,6 @@ impl Projectile {
             return;
         }
         self.lifetime += dt;
-        self.update_position(dt);
     }
 
     /// Returns the position of the projectile.
