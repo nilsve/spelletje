@@ -2,28 +2,23 @@
 /// Projectiles are entities that move through the air and can collide with platforms and players.
 
 use crate::obstacle::Aabb;
-use crate::physics::PositionUpdate;
+use crate::physics::{PhysicsData, PhysicsEntity};
 
 #[derive(Clone, Debug)]
 pub struct Projectile {
-    pub x: f32,
-    pub y: f32,
-    pub z: f32,
-    pub vel_x: f32,
-    pub vel_y: f32,
-    pub vel_z: f32,
+    pub physics_data: PhysicsData,
     pub lifetime: f32,
     pub max_lifetime: f32,
     pub damage: f32,
 }
 
 impl Aabb for Projectile {
-    fn min_x(&self) -> f32 { self.x - 0.1 }
-    fn max_x(&self) -> f32 { self.x + 0.1 }
-    fn min_y(&self) -> f32 { self.y - 0.1 }
-    fn max_y(&self) -> f32 { self.y + 0.1 }
-    fn min_z(&self) -> f32 { self.z - 0.1 }
-    fn max_z(&self) -> f32 { self.z + 0.1 }
+    fn min_x(&self) -> f32 { self.physics_data.x - 0.1 }
+    fn max_x(&self) -> f32 { self.physics_data.x + 0.1 }
+    fn min_y(&self) -> f32 { self.physics_data.y - 0.1 }
+    fn max_y(&self) -> f32 { self.physics_data.y + 0.1 }
+    fn min_z(&self) -> f32 { self.physics_data.z - 0.1 }
+    fn max_z(&self) -> f32 { self.physics_data.z + 0.1 }
 }
 
 impl Projectile {
@@ -31,12 +26,11 @@ impl Projectile {
         let speed = (vel_x * vel_x + vel_y * vel_y + vel_z * vel_z).sqrt().max(0.1);
         let max_lifetime = speed / 10.0;
         Self {
-            x,
-            y,
-            z,
-            vel_x,
-            vel_y,
-            vel_z,
+            physics_data: PhysicsData {
+                x, y, z,
+                vel_x, vel_y, vel_z,
+                size: 0.1,
+            },
             lifetime: 0.0,
             max_lifetime,
             damage,
@@ -55,6 +49,15 @@ impl Projectile {
         self.update_position(dt);
     }
 
+    /// Returns the position of the projectile.
+    pub fn position(&self) -> (f32, f32, f32) {
+        (self.physics_data.x, self.physics_data.y, self.physics_data.z)
+    }
+
+    pub fn size(&self) -> f32 {
+        self.physics_data.size
+    }
+
     /// Check if projectile collides with a platform.
     /// Returns true if the projectile hit the platform (and should be removed).
     pub fn resolve_platform_collision(
@@ -67,12 +70,12 @@ impl Projectile {
         platform_back: f32,
     ) -> bool {
         let half_size = 0.1;
-        let proj_left = self.x - half_size;
-        let proj_right = self.x + half_size;
-        let proj_bottom = self.y - half_size;
-        let proj_top = self.y + half_size;
-        let proj_front = self.z - half_size;
-        let proj_back = self.z + half_size;
+        let proj_left = self.physics_data.x - half_size;
+        let proj_right = self.physics_data.x + half_size;
+        let proj_bottom = self.physics_data.y - half_size;
+        let proj_top = self.physics_data.y + half_size;
+        let proj_front = self.physics_data.z - half_size;
+        let proj_back = self.physics_data.z + half_size;
 
         // Check Y overlap
         if proj_top < platform_bottom || proj_bottom > platform_top {
@@ -102,12 +105,12 @@ impl Projectile {
         player_half_size: f32,
     ) -> bool {
         let half_size = 0.1;
-        let proj_left = self.x - half_size;
-        let proj_right = self.x + half_size;
-        let proj_bottom = self.y - half_size;
-        let proj_top = self.y + half_size;
-        let proj_front = self.z - half_size;
-        let proj_back = self.z + half_size;
+        let proj_left = self.physics_data.x - half_size;
+        let proj_right = self.physics_data.x + half_size;
+        let proj_bottom = self.physics_data.y - half_size;
+        let proj_top = self.physics_data.y + half_size;
+        let proj_front = self.physics_data.z - half_size;
+        let proj_back = self.physics_data.z + half_size;
 
         let player_left = player_x - player_half_size;
         let player_right = player_x + player_half_size;
@@ -132,11 +135,19 @@ impl Projectile {
     }
 }
 
-impl PositionUpdate for Projectile {
+impl PhysicsEntity for Projectile {
+    fn physics_data(&self) -> &PhysicsData {
+        &self.physics_data
+    }
+
+    fn physics_data_mut(&mut self) -> &mut PhysicsData {
+        &mut self.physics_data
+    }
+
     fn update_position(&mut self, dt: f32) {
-        self.x += self.vel_x * dt;
-        self.y += self.vel_y * dt;
-        self.z += self.vel_z * dt;
+        self.physics_data.x += self.physics_data.vel_x * dt;
+        self.physics_data.y += self.physics_data.vel_y * dt;
+        self.physics_data.z += self.physics_data.vel_z * dt;
     }
 }
 
@@ -163,9 +174,9 @@ mod tests {
 
         projectile.update(dt);
 
-        assert!((projectile.x - 0.08).abs() < 0.01);
-        assert!((projectile.y - 0.0).abs() < 0.01);
-        assert!((projectile.z - 0.0).abs() < 0.01);
+        assert!((projectile.physics_data.x - 0.08).abs() < 0.01);
+        assert!((projectile.physics_data.y - 0.0).abs() < 0.01);
+        assert!((projectile.physics_data.z - 0.0).abs() < 0.01);
     }
 
     #[test]
@@ -199,15 +210,15 @@ mod tests {
             projectile.update(dt);
         }
 
-        let x_before = projectile.x;
-        let y_before = projectile.y;
-        let z_before = projectile.z;
+        let x_before = projectile.physics_data.x;
+        let y_before = projectile.physics_data.y;
+        let z_before = projectile.physics_data.z;
 
         projectile.update(dt);
 
-        assert!((projectile.x - x_before).abs() < 0.001);
-        assert!((projectile.y - y_before).abs() < 0.001);
-        assert!((projectile.z - z_before).abs() < 0.001);
+        assert!((projectile.physics_data.x - x_before).abs() < 0.001);
+        assert!((projectile.physics_data.y - y_before).abs() < 0.001);
+        assert!((projectile.physics_data.z - z_before).abs() < 0.001);
     }
 
     #[test]

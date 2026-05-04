@@ -1,6 +1,6 @@
 use crate::player::Player;
 use crate::obstacle::{Aabb, Obstacle, is_colliding};
-use crate::physics::{Physics, CollisionResult};
+use crate::physics::{PhysicsImpl, CollisionResult};
 use crate::input::Input;
 use crate::projectile::Projectile;
 use crate::enemy::Enemy;
@@ -71,7 +71,7 @@ impl World {
                 continue;
             }
 
-            let mut hit = false;
+                let mut hit = false;
             for obstacle in &self.obstacles {
                 if is_colliding(&projectile, obstacle) {
                     hit = true;
@@ -82,10 +82,10 @@ impl World {
             if !hit {
                 for entity in &self.entities {
                     let player_aabb = PlayerAabb {
-                        x: entity.x,
-                        y: entity.y + entity.size / 2.0,
-                        z: entity.z,
-                        size: entity.size / 2.0,
+                        x: entity.physics_data.x,
+                        y: entity.physics_data.y + entity.physics_data.size / 2.0,
+                        z: entity.physics_data.z,
+                        size: entity.physics_data.size / 2.0,
                     };
                     if is_colliding(&projectile, &player_aabb) {
                         hit = true;
@@ -101,7 +101,7 @@ impl World {
         self.projectiles = alive;
     }
 
-    pub fn update_all(&mut self, input: &Input, physics: &dyn Physics, dt: f32) {
+    pub fn update_all(&mut self, input: &Input, physics: &PhysicsImpl, dt: f32) {
         for entity in &mut self.entities {
             entity.update(input, physics, dt);
         }
@@ -110,45 +110,44 @@ impl World {
             for obstacle in &self.obstacles {
                 let collision = physics.resolve_platform_collision(
                     entity,
-                    &entity.vel_y,
+                    &entity.physics_data.vel_y,
                     obstacle,
                     obstacle.kind.clone(),
                 );
                 if collision == CollisionResult::Bottom {
-                    entity.y = obstacle.max_y();
-                    entity.vel_y = 0.0;
+                    entity.physics_data.y = obstacle.max_y();
+                    entity.physics_data.vel_y = 0.0;
                     entity.set_grounded(true);
-                    let config = entity.config.to_physics_config();
-                    physics.apply_friction(&mut entity.vel_x, dt, &config);
+                    physics.apply_friction(&mut entity.physics_data.vel_x, dt);
                 }
 
                 if collision == CollisionResult::Top {
-                    entity.y = obstacle.min_y() - entity.size;
-                    entity.vel_y = 0.0;
+                    entity.physics_data.y = obstacle.min_y() - entity.physics_data.size;
+                    entity.physics_data.vel_y = 0.0;
                 }
 
                 let h_collision = physics.resolve_horizontal_collision(
                     entity,
-                    &entity.vel_x,
+                    &entity.physics_data.vel_x,
                     obstacle,
                     obstacle.kind.clone(),
                 );
                 match h_collision {
                     CollisionResult::Right => {
-                        if entity.x < obstacle.x {
-                            entity.x = obstacle.min_x() - entity.size / 2.0;
+                        if entity.physics_data.x < obstacle.x {
+                            entity.physics_data.x = obstacle.min_x() - entity.physics_data.size / 2.0;
                         } else {
-                            entity.x = obstacle.max_x() - entity.size / 2.0;
+                            entity.physics_data.x = obstacle.max_x() - entity.physics_data.size / 2.0;
                         }
-                        entity.vel_x = 0.0;
+                        entity.physics_data.vel_x = 0.0;
                     }
                     CollisionResult::Left => {
-                        if entity.x < obstacle.x {
-                            entity.x = obstacle.min_x() - entity.size / 2.0;
+                        if entity.physics_data.x < obstacle.x {
+                            entity.physics_data.x = obstacle.min_x() - entity.physics_data.size / 2.0;
                         } else {
-                            entity.x = obstacle.max_x() + entity.size / 2.0;
+                            entity.physics_data.x = obstacle.max_x() + entity.physics_data.size / 2.0;
                         }
-                        entity.vel_x = 0.0;
+                        entity.physics_data.vel_x = 0.0;
                     }
                     _ => {}
                 }
@@ -266,22 +265,22 @@ mod tests {
     fn test_entity_updates_in_world() {
         let mut world = World::new();
         let mut player = Player::new();
-        player.vel_x = 5.0;
+        player.physics_data.vel_x = 5.0;
         world.add_entity(player);
 
         let input = default_input();
         let physics = PhysicsImpl::new();
         world.update_all(&input, &physics, 0.016);
 
-        assert!(world.entities[0].x > 0.0);
+        assert!(world.entities[0].physics_data.x > 0.0);
     }
 
     #[test]
     fn test_obstacle_collision_with_world() {
         let mut world = World::new();
         let mut player = Player::new();
-        player.y = 5.0;
-        player.vel_y = -10.0;
+        player.physics_data.y = 5.0;
+        player.physics_data.vel_y = -10.0;
         world.add_entity(player);
         world.add_obstacle(Obstacle::solid(0.0, 0.0, 0.0, 10.0, 0.5, 10.0));
 
@@ -290,26 +289,26 @@ mod tests {
         world.update_all(&input, &physics, 0.016);
 
         let entity = &world.entities[0];
-        assert!(entity.y >= 0.0);
+        assert!(entity.physics_data.y >= 0.0);
     }
 
     #[test]
     fn test_multiple_entities_update() {
         let mut world = World::new();
         let mut player1 = Player::new();
-        player1.vel_x = 5.0;
+        player1.physics_data.vel_x = 5.0;
         world.add_entity(player1);
 
         let mut player2 = Player::new();
-        player2.vel_z = -3.0;
+        player2.physics_data.vel_z = -3.0;
         world.add_entity(player2);
 
         let input = default_input();
         let physics = PhysicsImpl::new();
         world.update_all(&input, &physics, 0.016);
 
-        assert!(world.entities[0].x > 0.0);
-        assert!(world.entities[1].z < 0.0);
+        assert!(world.entities[0].physics_data.x > 0.0);
+        assert!(world.entities[1].physics_data.z < 0.0);
     }
 
     #[test]
@@ -325,9 +324,9 @@ mod tests {
     fn test_platform_no_horizontal_collision() {
         let mut world = World::new();
         let mut player = Player::new();
-        player.x = 3.0;
-        player.vel_x = 2.0;
-        player.y = 1.0;
+        player.physics_data.x = 3.0;
+        player.physics_data.vel_x = 2.0;
+        player.physics_data.y = 1.0;
         world.add_entity(player);
         // Solid wall at x=5
         world.add_obstacle(Obstacle::solid(5.0, 1.0, 0.0, 1.0, 2.0, 10.0));
@@ -340,7 +339,7 @@ mod tests {
 
         let entity = &world.entities[0];
         // Should hit the solid wall at x=5
-        assert!(entity.x < 5.5);
+        assert!(entity.physics_data.x < 5.5);
     }
 
     #[test]
@@ -362,7 +361,7 @@ mod tests {
 
         world.update_projectiles(0.016);
 
-        assert!(world.projectiles[0].x > 0.0);
+        assert!(world.projectiles[0].physics_data.x > 0.0);
     }
 
     #[test]
@@ -395,8 +394,8 @@ mod tests {
     fn test_projectile_collides_with_player() {
         let mut world = World::new();
         let mut player = Player::new();
-        player.x = 5.0;
-        player.y = 0.5;
+        player.physics_data.x = 5.0;
+        player.physics_data.y = 0.5;
         world.add_entity(player);
         let projectile = Projectile::new(4.5, 1.0, 0.0, 5.0, 0.0, 0.0, 10.0);
         world.add_projectile(projectile);
@@ -411,7 +410,7 @@ mod tests {
     fn test_update_all_includes_projectile_update() {
         let mut world = World::new();
         let mut player = Player::new();
-        player.y = 10.0;
+        player.physics_data.y = 10.0;
         world.add_entity(player);
         world.add_platform(0.0, -0.25, 0.0, 100.0, 0.5, 100.0);
         let projectile = Projectile::new(0.0, 1.0, 0.0, 10.0, 0.0, 0.0, 10.0);
@@ -421,6 +420,6 @@ mod tests {
         let physics = PhysicsImpl::new();
         world.update_all(&input, &physics, 0.016);
 
-        assert!(world.projectiles[0].x > 0.0);
+        assert!(world.projectiles[0].physics_data.x > 0.0);
     }
 }

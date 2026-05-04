@@ -56,7 +56,7 @@ pub fn run_cli(input_str: &str) {
     println!("Sequence: {:?}", sequence);
     let initial = &world.entities[0];
     println!("{{\"x\":{:.2},\"y\":{:.2},\"z\":{:.2},\"vel_x\":{:.2},\"vel_y\":{:.2},\"vel_z\":{:.2},\"grounded\":{}}}", 
-        initial.x, initial.y, initial.z, initial.vel_x, initial.vel_y, initial.vel_z, initial.grounded);
+        initial.physics_data.x, initial.physics_data.y, initial.physics_data.z, initial.physics_data.vel_x, initial.physics_data.vel_y, initial.physics_data.vel_z, initial.grounded);
     loop {
         // Get current keys from sequence
         let current_keys: Vec<char> = if seq_idx < sequence.len() {
@@ -78,7 +78,7 @@ pub fn run_cli(input_str: &str) {
         // Print debug info
         if frame_count % 20 == 0 {
             println!("Frame {}: keys={:?} pos=({:.2}, {:.2}, {:.2}) projectiles={}", 
-                frame_count, current_keys, world.entities[0].x, world.entities[0].y, world.entities[0].z, world.projectile_count());
+                frame_count, current_keys, world.entities[0].physics_data.x, world.entities[0].physics_data.y, world.entities[0].physics_data.z, world.projectile_count());
         }
         // Advance sequence based on elapsed time
         elapsed += 0.016;
@@ -89,7 +89,7 @@ pub fn run_cli(input_str: &str) {
         // Exit when sequence is done
         if seq_idx >= sequence.len() {
             println!("Simulation complete. Final position: ({:.2}, {:.2}, {:.2})", 
-                world.entities[0].x, world.entities[0].y, world.entities[0].z);
+                world.entities[0].physics_data.x, world.entities[0].physics_data.y, world.entities[0].physics_data.z);
             break;
         }
         frame_count += 1;

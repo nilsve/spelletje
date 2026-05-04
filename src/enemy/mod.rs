@@ -3,7 +3,7 @@
 use crate::player::Player;
 use crate::obstacle::Aabb;
 use crate::projectile::Projectile;
-use crate::physics::{PhysicsConfig, PositionUpdate};
+use crate::physics::{PhysicsConfig, PhysicsData, PhysicsEntity};
 use crate::shooter::Shooter;
 
 #[derive(Clone, Debug)]
@@ -41,13 +41,7 @@ impl Default for EnemyConfig {
 
 #[derive(Clone, Debug)]
 pub struct Enemy {
-    pub x: f32,
-    pub y: f32,
-    pub z: f32,
-    pub size: f32,
-    pub vel_x: f32,
-    pub vel_y: f32,
-    pub vel_z: f32,
+    pub physics_data: PhysicsData,
     pub grounded: bool,
     pub config: EnemyConfig,
     pub alive: bool,
@@ -58,13 +52,7 @@ pub struct Enemy {
 impl Enemy {
     pub fn new(config: EnemyConfig) -> Self {
         Self {
-            x: 0.0,
-            y: 0.0,
-            z: 0.0,
-            size: 1.0,
-            vel_x: 0.0,
-            vel_y: 0.0,
-            vel_z: 0.0,
+            physics_data: PhysicsData::default(),
             grounded: true,
             config,
             alive: true,
@@ -75,13 +63,7 @@ impl Enemy {
 
     pub fn with_config(config: EnemyConfig) -> Self {
         Self {
-            x: 0.0,
-            y: 0.0,
-            z: 0.0,
-            size: 1.0,
-            vel_x: 0.0,
-            vel_y: 0.0,
-            vel_z: 0.0,
+            physics_data: PhysicsData::default(),
             grounded: true,
             config,
             alive: true,
@@ -90,11 +72,19 @@ impl Enemy {
         }
     }
 
+    pub fn pos(&self) -> (f32, f32, f32) {
+        (self.physics_data.x, self.physics_data.y, self.physics_data.z)
+    }
+
+    pub fn size(&self) -> f32 {
+        self.physics_data.size
+    }
+
     /// Returns the shoot direction toward the player.
     fn shoot_direction_toward(&self, target_x: f32, target_y: f32, target_z: f32) -> (f32, f32, f32) {
-        let dx = target_x - self.x;
-        let dy = target_y - (self.y + self.size / 2.0);
-        let dz = target_z - self.z;
+        let dx = target_x - self.physics_data.x;
+        let dy = target_y - (self.physics_data.y + self.physics_data.size / 2.0);
+        let dz = target_z - self.physics_data.z;
         let len = (dx * dx + dy * dy + dz * dz).sqrt().max(0.01);
         (dx / len, dy / len, dz / len)
     }
@@ -105,25 +95,30 @@ impl Enemy {
         self.fire_with_direction(dir)
     }
 
+    /// Returns the shoot origin point for the enemy.
+    fn shoot_origin(&self) -> (f32, f32, f32) {
+        (self.physics_data.x, self.physics_data.y + self.physics_data.size / 2.0, self.physics_data.z)
+    }
+
     /// Updates enemy AI: movement toward player and shooting.
     pub fn update_ai(&mut self, player: &Player, dt: f32) {
         if !self.alive {
             return;
         }
 
-        let dx = player.x - self.x;
-        let dy = player.y - self.y;
-        let dz = player.z - self.z;
+        let dx = player.physics_data.x - self.physics_data.x;
+        let dy = player.physics_data.y - self.physics_data.y;
+        let dz = player.physics_data.z - self.physics_data.z;
         let dist = (dx * dx + dy * dy + dz * dz).sqrt();
 
-        self.last_player_pos = (player.x, player.y, player.z);
+        self.last_player_pos = (player.physics_data.x, player.physics_data.y, player.physics_data.z);
 
         // Movement toward player
         if dist > 2.0 && dist < self.config.detection_range {
-            let target_x = player.x;
-            let target_z = player.z;
-            let move_dx = target_x - self.x;
-            let move_dz = target_z - self.z;
+            let target_x = player.physics_data.x;
+            let target_z = player.physics_data.z;
+            let move_dx = target_x - self.physics_data.x;
+            let move_dz = target_z - self.physics_data.z;
             let move_len = (move_dx * move_dx + move_dz * move_dz).sqrt().max(0.01);
             let normalized_dx = move_dx / move_len;
             let normalized_dz = move_dz / move_len;
@@ -135,23 +130,23 @@ impl Enemy {
             let input_z = normalized_dz;
             
             if input_x.abs() > 0.01 {
-                self.vel_x += input_x * self.config.acceleration * dt;
+                self.physics_data.vel_x += input_x * self.config.acceleration * dt;
             }
             if input_z.abs() > 0.01 {
-                self.vel_z += input_z * self.config.acceleration * dt;
+                self.physics_data.vel_z += input_z * self.config.acceleration * dt;
             }
 
             // Clamp speed
-            let speed = (self.vel_x * self.vel_x + self.vel_z * self.vel_z).sqrt();
+            let speed = (self.physics_data.vel_x * self.physics_data.vel_x + self.physics_data.vel_z * self.physics_data.vel_z).sqrt();
             if speed > self.config.speed {
                 let scale = self.config.speed / speed;
-                self.vel_x *= scale;
-                self.vel_z *= scale;
+                self.physics_data.vel_x *= scale;
+                self.physics_data.vel_z *= scale;
             }
 
             // Jump if player is above
             if dy > 1.0 && self.grounded && dist < self.config.shoot_range * 1.5 {
-                self.vel_y = self.config.jump_force;
+                self.physics_data.vel_y = self.config.jump_force;
                 self.grounded = false;
             }
         } else if dist <= self.config.shoot_range {
@@ -161,28 +156,28 @@ impl Enemy {
             let strafe_dz = f32::sin(strafe_angle + std::f32::consts::FRAC_PI_2) * 0.5;
             
             let _pc = self.config.to_physics_config();
-            self.vel_x += strafe_dx * self.config.acceleration * dt;
-            self.vel_z += strafe_dz * self.config.acceleration * dt;
+            self.physics_data.vel_x += strafe_dx * self.config.acceleration * dt;
+            self.physics_data.vel_z += strafe_dz * self.config.acceleration * dt;
             
-            let speed = (self.vel_x * self.vel_x + self.vel_z * self.vel_z).sqrt();
+            let speed = (self.physics_data.vel_x * self.physics_data.vel_x + self.physics_data.vel_z * self.physics_data.vel_z).sqrt();
             if speed > self.config.speed * 0.5 {
                 let scale = (self.config.speed * 0.5) / speed;
-                self.vel_x *= scale;
-                self.vel_z *= scale;
+                self.physics_data.vel_x *= scale;
+                self.physics_data.vel_z *= scale;
             }
         } else {
             // Apply friction when not moving
-            self.vel_x *= (1.0 - self.config.friction * dt).max(0.0);
-            self.vel_z *= (1.0 - self.config.friction * dt).max(0.0);
+            self.physics_data.vel_x *= (1.0 - self.config.friction * dt).max(0.0);
+            self.physics_data.vel_z *= (1.0 - self.config.friction * dt).max(0.0);
         }
 
         // Gravity
-        self.vel_y -= self.config.gravity * dt;
+        self.physics_data.vel_y -= self.config.gravity * dt;
 
         // Ground check
-        if self.y <= self.config.friction_threshold && self.vel_y <= 0.0 {
-            self.y = self.config.friction_threshold;
-            self.vel_y = 0.0;
+        if self.physics_data.y <= self.config.friction_threshold && self.physics_data.vel_y <= 0.0 {
+            self.physics_data.y = self.config.friction_threshold;
+            self.physics_data.vel_y = 0.0;
             self.grounded = true;
         }
 
@@ -202,13 +197,13 @@ impl Enemy {
             return None;
         }
         
-        let dx = player.x - self.x;
-        let dy = player.y + player.size / 2.0 - (self.y + self.size / 2.0);
-        let dz = player.z - self.z;
+        let dx = player.physics_data.x - self.physics_data.x;
+        let dy = player.physics_data.y + player.physics_data.size / 2.0 - (self.physics_data.y + self.physics_data.size / 2.0);
+        let dz = player.physics_data.z - self.physics_data.z;
         let dist = (dx * dx + dy * dy + dz * dz).sqrt();
 
         if self.shoot_timer >= self.config.shoot_interval && dist < self.config.shoot_range {
-            Some(self.shoot_at(player.x, player.y + player.size / 2.0, player.z))
+            Some(self.shoot_at(player.physics_data.x, player.physics_data.y + player.physics_data.size / 2.0, player.physics_data.z))
         } else {
             None
         }
@@ -227,17 +222,25 @@ impl Enemy {
     }
 }
 
-impl PositionUpdate for Enemy {
+impl PhysicsEntity for Enemy {
+    fn physics_data(&self) -> &PhysicsData {
+        &self.physics_data
+    }
+
+    fn physics_data_mut(&mut self) -> &mut PhysicsData {
+        &mut self.physics_data
+    }
+
     fn update_position(&mut self, dt: f32) {
-        self.x += self.vel_x * dt;
-        self.y += self.vel_y * dt;
-        self.z += self.vel_z * dt;
+        self.physics_data.x += self.physics_data.vel_x * dt;
+        self.physics_data.y += self.physics_data.vel_y * dt;
+        self.physics_data.z += self.physics_data.vel_z * dt;
     }
 }
 
 impl Shooter for Enemy {
     fn shoot_origin(&self) -> (f32, f32, f32) {
-        (self.x, self.y + self.size / 2.0, self.z)
+        (self.physics_data.x, self.physics_data.y + self.physics_data.size / 2.0, self.physics_data.z)
     }
 
     fn projectile_speed(&self) -> f32 {
@@ -263,12 +266,12 @@ impl EnemyConfig {
 }
 
 impl Aabb for Enemy {
-    fn min_x(&self) -> f32 { self.x - self.size / 2.0 }
-    fn max_x(&self) -> f32 { self.x + self.size / 2.0 }
-    fn min_y(&self) -> f32 { self.y }
-    fn max_y(&self) -> f32 { self.y + self.size }
-    fn min_z(&self) -> f32 { self.z - self.size / 2.0 }
-    fn max_z(&self) -> f32 { self.z + self.size / 2.0 }
+    fn min_x(&self) -> f32 { self.physics_data.x - self.physics_data.size / 2.0 }
+    fn max_x(&self) -> f32 { self.physics_data.x + self.physics_data.size / 2.0 }
+    fn min_y(&self) -> f32 { self.physics_data.y }
+    fn max_y(&self) -> f32 { self.physics_data.y + self.physics_data.size }
+    fn min_z(&self) -> f32 { self.physics_data.z - self.physics_data.size / 2.0 }
+    fn max_z(&self) -> f32 { self.physics_data.z + self.physics_data.size / 2.0 }
 }
 
 #[cfg(test)]
@@ -279,7 +282,7 @@ mod tests {
     fn test_enemy_creation() {
         let enemy = Enemy::new(EnemyConfig::default());
         assert!(enemy.alive);
-        assert!((enemy.x - 0.0).abs() < 0.01);
+        assert!((enemy.physics_data.x - 0.0).abs() < 0.01);
     }
 
     #[test]

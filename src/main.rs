@@ -31,14 +31,15 @@ fn draw_obstacle(obstacle: &Obstacle, color: Color) {
 #[cfg(feature = "gui")]
 fn draw_projectile(projectile: &Projectile) {
     let size = vec3(0.15, 0.15, 0.15);
-    let pos = vec3(projectile.x, projectile.y, projectile.z);
+    let pos = vec3(projectile.position().0, projectile.position().1, projectile.position().2);
     draw_cube(pos, size, None, YELLOW);
     draw_cube_wires(pos, size, ORANGE);
 }
 
 #[cfg(feature = "gui")]
 fn draw_gun(player: &Player) {
-    let gun_start = vec3(player.x, player.y + player.size / 2.0, player.z);
+    let pos = player.pos();
+    let gun_start = vec3(pos.0, pos.1 + player.size() / 2.0, pos.2);
     let gun_end = player.gun_end();
     let gun_pos = vec3(gun_end.0, gun_end.1, gun_end.2);
     draw_line_3d(gun_start, gun_pos, WHITE);
@@ -46,8 +47,10 @@ fn draw_gun(player: &Player) {
 
 #[cfg(feature = "gui")]
 fn draw_enemy(enemy: &Enemy) {
-    let size = vec3(enemy.size, enemy.size, enemy.size * 0.8);
-    let pos = vec3(enemy.x, enemy.y + enemy.size / 2.0, enemy.z);
+    let pos = enemy.pos();
+    let s = enemy.size();
+    let size = vec3(s, s, s * 0.8);
+    let pos_vec = vec3(pos.0, pos.1 + s / 2.0, pos.2);
     let color = if enemy.config.health > 30.0 {
         RED
     } else if enemy.config.health > 15.0 {
@@ -55,8 +58,8 @@ fn draw_enemy(enemy: &Enemy) {
     } else {
         Color::new(0.4, 0.0, 0.0, 1.0)
     };
-    draw_cube(pos, size, None, color);
-    draw_cube_wires(pos, size, Color::new(0.2, 0.0, 0.0, 1.0));
+    draw_cube(pos_vec, size, None, color);
+    draw_cube_wires(pos_vec, size, Color::new(0.2, 0.0, 0.0, 1.0));
 }
 
 #[cfg(feature = "gui")]
@@ -72,12 +75,12 @@ async fn game_loop() {
 
     // Spawn enemies
     world.add_enemy(Enemy::new(EnemyConfig::default()));
-    world.enemies[0].x = 10.0;
-    world.enemies[0].z = 5.0;
+    world.enemies[0].physics_data.x = 10.0;
+    world.enemies[0].physics_data.z = 5.0;
     
     let mut enemy2 = Enemy::new(EnemyConfig::default());
-    enemy2.x = -8.0;
-    enemy2.z = 8.0;
+    enemy2.physics_data.x = -8.0;
+    enemy2.physics_data.z = 8.0;
     enemy2.config.health = 80.0;
     enemy2.config.damage = 15.0;
     enemy2.config.shoot_interval = 1.5;
@@ -110,10 +113,12 @@ async fn game_loop() {
         world.update_all(&input, &physics, dt);
 
         let player_ref = world.entities.first().unwrap();
+        let p = player_ref.pos();
+        let s = player_ref.size();
 
         let screen_aspect = sw / screen_height();
         let cam_height = 15.0;
-        let cam_target = vec3(player_ref.x, player_ref.y + player_ref.size / 2.0, player_ref.z);
+        let cam_target = vec3(p.0, p.1 + s / 2.0, p.2);
         let camera = Camera3D {
             position: vec3(cam_target.x, cam_target.y, cam_target.z + cam_height),
             target: cam_target,
@@ -139,8 +144,10 @@ async fn game_loop() {
         }
 
         for entity in &world.entities {
-            let size = vec3(entity.size, entity.size, entity.size * 0.5);
-            let pos = vec3(entity.x, entity.y + entity.size / 2.0, entity.z);
+            let s = entity.size();
+            let e = entity.pos();
+            let size = vec3(s, s, s * 0.5);
+            let pos = vec3(e.0, e.1 + s / 2.0, e.2);
             draw_cube(pos, size, None, BLUE);
             draw_cube_wires(pos, size, DARKBLUE);
         }
@@ -160,7 +167,7 @@ async fn game_loop() {
         set_default_camera();
         draw_text("A/D to move | W to jump | S to move depth | Mouse to aim | Click to shoot", 10.0, 30.0, 20.0, WHITE);
         draw_text(
-            &format!("X: {:.1}  Y: {:.1}  Z: {:.1}", player_ref.x, player_ref.y, player_ref.z),
+            &format!("X: {:.1}  Y: {:.1}  Z: {:.1}", p.0, p.1, p.2),
             10.0, 55.0, 20.0, YELLOW,
         );
         draw_text(
