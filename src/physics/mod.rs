@@ -1,6 +1,7 @@
+use crate::enemy::Enemy;
 /// Core physics calculations: gravity, friction, collision resolution.
 /// All constants are configurable via PhysicsConfig for tuning and testing.
-use crate::obstacle::{Aabb, ObstacleKind};
+use crate::obstacle::{Aabb, Obstacle, ObstacleKind};
 
 /// Result of a collision detection check.
 #[derive(Clone, Debug, PartialEq)]
@@ -18,7 +19,7 @@ pub enum CollisionResult {
 }
 
 #[derive(Clone, Debug)]
-pub struct PhysicsConfig {
+pub struct GlobalPhysicsConfig {
     pub gravity: f32,
     pub jump_force: f32,
     pub max_speed: f32,
@@ -27,7 +28,7 @@ pub struct PhysicsConfig {
     pub friction_threshold: f32,
 }
 
-impl Default for PhysicsConfig {
+impl Default for GlobalPhysicsConfig {
     fn default() -> Self {
         Self {
             gravity: 20.0,
@@ -41,8 +42,8 @@ impl Default for PhysicsConfig {
 }
 
 /// Shared positioning data for all physics-enabled entities.
-#[derive(Clone, Debug, Default)]
-pub struct PhysicsData {
+#[derive(Clone, Debug)]
+pub struct EntityPhysicsData {
     pub x: f32,
     pub y: f32,
     pub z: f32,
@@ -50,23 +51,45 @@ pub struct PhysicsData {
     pub vel_y: f32,
     pub vel_z: f32,
     pub size: f32,
+    pub is_grounded: bool,
+}
+
+impl Default for EntityPhysicsData {
+    fn default() -> Self {
+        Self {
+            size: 1.0,
+            x: 0.,
+            y: 0.,
+            z: 0.,
+            vel_x: 0.,
+            vel_y: 0.,
+            vel_z: 0.,
+            is_grounded: false,
+        }
+    }
 }
 
 /// Trait for entities that provide positioning data for physics calculations.
 pub trait PhysicsEntity {
-    fn physics_data(&self) -> &PhysicsData;
-    fn physics_data_mut(&mut self) -> &mut PhysicsData;
-    fn update_position(&mut self, dt: f32);
+    fn physics_data(&self) -> &EntityPhysicsData;
+    fn physics_data_mut(&mut self) -> &mut EntityPhysicsData;
+    fn update_position(&mut self, dt: f32) {
+        self.physics_data_mut().x += self.physics_data().vel_x * dt;
+        self.physics_data_mut().y += self.physics_data().vel_y * dt;
+        self.physics_data_mut().z += self.physics_data().vel_z * dt;
+    }
 }
 
 /// Physics engine: wraps configuration and provides physics calculations.
 pub struct PhysicsImpl {
-    config: PhysicsConfig,
+    config: GlobalPhysicsConfig,
 }
 
 impl Default for PhysicsImpl {
     fn default() -> Self {
-        Self { config: PhysicsConfig::default() }
+        Self {
+            config: GlobalPhysicsConfig::default(),
+        }
     }
 }
 
@@ -75,11 +98,11 @@ impl PhysicsImpl {
         Self::default()
     }
 
-    pub fn with_config(config: PhysicsConfig) -> Self {
+    pub fn with_config(config: GlobalPhysicsConfig) -> Self {
         Self { config }
     }
 
-    pub fn config(&self) -> &PhysicsConfig {
+    pub fn config(&self) -> &GlobalPhysicsConfig {
         &self.config
     }
 
@@ -89,6 +112,74 @@ impl PhysicsImpl {
 
     pub fn apply_jump(&self, vel_y: &mut f32) {
         *vel_y = self.config.jump_force;
+    }
+
+    pub fn is_grounded(&self, entity_physics_data: &EntityPhysicsData) -> bool {
+        entity_physics_data.y <= self.config.friction_threshold && entity_physics_data.vel_y == 0.0
+    }
+
+    pub fn update<E: PhysicsEntity + Aabb>(
+        &self,
+        physics_entity: &mut E,
+        obstacles: &[Obstacle],
+        dt: f32,
+    ) {
+        let mut is_grounded = false;
+        for obstacle in obstacles {
+            let collision = self.resolve_platform_collision(
+                physics_entity,
+                &physics_entity.physics_data().vel_y,
+                obstacle,
+                obstacle.kind.clone(),
+            );
+            if collision == CollisionResult::Bottom {
+                let physics_data = physics_entity.physics_data_mut();
+                physics_data.y = obstacle.max_y();
+                physics_data.vel_y = 0.0;
+                is_grounded = true;
+                self.apply_friction(&mut physics_data.vel_x, dt);
+            }
+
+            if collision == CollisionResult::Top {
+                let physics_data = physics_entity.physics_data_mut();
+                physics_data.y = obstacle.min_y() - physics_data.size;
+                physics_data.vel_y = 0.0;
+            }
+
+            let h_collision = self.resolve_horizontal_collision(
+                physics_entity,
+                &physics_entity.physics_data().vel_x,
+                obstacle,
+                obstacle.kind.clone(),
+            );
+            match h_collision {
+                CollisionResult::Right => {
+                    let physics_data = physics_entity.physics_data();
+                    if physics_data.x < obstacle.x {
+                        physics_entity.physics_data_mut().x =
+                            obstacle.min_x() - physics_data.size / 2.0;
+                    } else {
+                        physics_entity.physics_data_mut().x =
+                            obstacle.max_x() - physics_data.size / 2.0;
+                    }
+                    physics_entity.physics_data_mut().vel_x = 0.0;
+                }
+                CollisionResult::Left => {
+                    let physics_data = physics_entity.physics_data();
+                    if physics_data.x < obstacle.x {
+                        physics_entity.physics_data_mut().x =
+                            obstacle.min_x() - physics_data.size / 2.0;
+                    } else {
+                        physics_entity.physics_data_mut().x =
+                            obstacle.max_x() + physics_data.size / 2.0;
+                    }
+                    physics_entity.physics_data_mut().vel_x = 0.0;
+                }
+                _ => {}
+            }
+        }
+
+        physics_entity.physics_data_mut().is_grounded = is_grounded;
     }
 
     pub fn apply_friction(&self, vel: &mut f32, dt: f32) {
@@ -107,8 +198,26 @@ impl PhysicsImpl {
         }
     }
 
-    pub fn apply_acceleration(&self, vel: &mut f32, input: f32, dt: f32) {
+    fn apply_acceleration(&self, vel: &mut f32, input: f32, dt: f32) {
         *vel += input * self.config.acceleration * dt;
+    }
+
+    pub fn apply_acceleration_x(
+        &self,
+        entity_physics_data: &mut EntityPhysicsData,
+        input: f32,
+        dt: f32,
+    ) {
+        self.apply_acceleration(&mut entity_physics_data.vel_x, input, dt);
+    }
+
+    pub fn apply_acceleration_y(
+        &self,
+        entity_physics_data: &mut EntityPhysicsData,
+        input: f32,
+        dt: f32,
+    ) {
+        self.apply_acceleration(&mut entity_physics_data.vel_y, input, dt);
     }
 
     pub fn clamp_speed(&self, vel: &mut f32) {
@@ -126,8 +235,10 @@ impl PhysicsImpl {
     ) -> CollisionResult {
         let pd = player.physics_data();
         if kind == ObstacleKind::Platform {
-            let overlap_x = pd.x + pd.size / 2.0 >= obstacle.min_x() && pd.x - pd.size / 2.0 <= obstacle.max_x();
-            let overlap_z = pd.z + pd.size / 2.0 >= obstacle.min_z() && pd.z - pd.size / 2.0 <= obstacle.max_z();
+            let overlap_x = pd.x + pd.size / 2.0 >= obstacle.min_x()
+                && pd.x - pd.size / 2.0 <= obstacle.max_x();
+            let overlap_z = pd.z + pd.size / 2.0 >= obstacle.min_z()
+                && pd.z - pd.size / 2.0 <= obstacle.max_z();
             if !overlap_x || !overlap_z {
                 return CollisionResult::None;
             }
@@ -138,15 +249,20 @@ impl PhysicsImpl {
                 CollisionResult::None
             }
         } else {
-            let overlap_x = pd.x + pd.size / 2.0 >= obstacle.min_x() && pd.x - pd.size / 2.0 <= obstacle.max_x();
-            let overlap_z = pd.z + pd.size / 2.0 >= obstacle.min_z() && pd.z - pd.size / 2.0 <= obstacle.max_z();
+            let overlap_x = pd.x + pd.size / 2.0 >= obstacle.min_x()
+                && pd.x - pd.size / 2.0 <= obstacle.max_x();
+            let overlap_z = pd.z + pd.size / 2.0 >= obstacle.min_z()
+                && pd.z - pd.size / 2.0 <= obstacle.max_z();
             if !overlap_x || !overlap_z {
                 return CollisionResult::None;
             }
 
             if *vel_y < 0.0 && pd.y <= obstacle.max_y() && pd.y >= obstacle.max_y() - 0.5 {
                 CollisionResult::Bottom
-            } else if *vel_y > 0.0 && pd.y + pd.size >= obstacle.min_y() && pd.y + pd.size <= obstacle.min_y() + 0.5 {
+            } else if *vel_y > 0.0
+                && pd.y + pd.size >= obstacle.min_y()
+                && pd.y + pd.size <= obstacle.min_y() + 0.5
+            {
                 CollisionResult::Top
             } else {
                 CollisionResult::None
@@ -167,14 +283,21 @@ impl PhysicsImpl {
 
         let pd = player.physics_data();
         let overlap_y = pd.y + pd.size > obstacle.min_y() && pd.y < obstacle.max_y();
-        let overlap_z = pd.z + pd.size / 2.0 >= obstacle.min_z() && pd.z - pd.size / 2.0 <= obstacle.max_z();
+        let overlap_z =
+            pd.z + pd.size / 2.0 >= obstacle.min_z() && pd.z - pd.size / 2.0 <= obstacle.max_z();
         if !overlap_y || !overlap_z {
             return CollisionResult::None;
         }
 
-        if *vel_x > 0.0 && pd.x + pd.size / 2.0 > obstacle.min_x() && pd.x - pd.size / 2.0 <= obstacle.min_x() {
+        if *vel_x > 0.0
+            && pd.x + pd.size / 2.0 > obstacle.min_x()
+            && pd.x - pd.size / 2.0 <= obstacle.min_x()
+        {
             CollisionResult::Right
-        } else if *vel_x < 0.0 && pd.x - pd.size / 2.0 < obstacle.max_x() && pd.x + pd.size / 2.0 >= obstacle.max_x() {
+        } else if *vel_x < 0.0
+            && pd.x - pd.size / 2.0 < obstacle.max_x()
+            && pd.x + pd.size / 2.0 >= obstacle.max_x()
+        {
             CollisionResult::Left
         } else {
             CollisionResult::None
@@ -187,8 +310,8 @@ mod tests {
     use super::*;
     use crate::obstacle::Obstacle;
 
-    fn default_config() -> PhysicsConfig {
-        PhysicsConfig::default()
+    fn default_config() -> GlobalPhysicsConfig {
+        GlobalPhysicsConfig::default()
     }
 
     #[test]
@@ -287,7 +410,8 @@ mod tests {
         let vel_y = -2.0;
         let obstacle = Obstacle::solid(0.0, 1.05, 0.0, 4.0, 0.1, 4.0);
 
-        let result = physics.resolve_platform_collision(&player, &vel_y, &obstacle, obstacle.kind.clone());
+        let result =
+            physics.resolve_platform_collision(&player, &vel_y, &obstacle, obstacle.kind.clone());
 
         assert_eq!(result, CollisionResult::Bottom);
     }
@@ -299,7 +423,8 @@ mod tests {
         let vel_y = -2.0;
         let obstacle = Obstacle::solid(0.0, 1.05, 0.0, 4.0, 0.1, 4.0);
 
-        let result = physics.resolve_platform_collision(&player, &vel_y, &obstacle, obstacle.kind.clone());
+        let result =
+            physics.resolve_platform_collision(&player, &vel_y, &obstacle, obstacle.kind.clone());
 
         assert_eq!(result, CollisionResult::None);
     }
@@ -311,7 +436,8 @@ mod tests {
         let vel_y = 2.0;
         let obstacle = Obstacle::solid(0.0, 2.55, 0.0, 4.0, 0.1, 4.0);
 
-        let result = physics.resolve_platform_collision(&player, &vel_y, &obstacle, obstacle.kind.clone());
+        let result =
+            physics.resolve_platform_collision(&player, &vel_y, &obstacle, obstacle.kind.clone());
 
         assert_eq!(result, CollisionResult::Top);
     }
@@ -323,7 +449,8 @@ mod tests {
         let vel_y = -2.0;
         let obstacle = Obstacle::solid(10.0, 1.05, 0.0, 4.0, 0.1, 4.0);
 
-        let result = physics.resolve_platform_collision(&player, &vel_y, &obstacle, obstacle.kind.clone());
+        let result =
+            physics.resolve_platform_collision(&player, &vel_y, &obstacle, obstacle.kind.clone());
 
         assert_eq!(result, CollisionResult::None);
     }
@@ -335,7 +462,8 @@ mod tests {
         let vel_y = -2.0;
         let obstacle = Obstacle::solid(0.0, 1.05, 10.0, 4.0, 0.1, 4.0);
 
-        let result = physics.resolve_platform_collision(&player, &vel_y, &obstacle, obstacle.kind.clone());
+        let result =
+            physics.resolve_platform_collision(&player, &vel_y, &obstacle, obstacle.kind.clone());
 
         assert_eq!(result, CollisionResult::None);
     }
@@ -347,7 +475,8 @@ mod tests {
         let vel_x = 1.0;
         let obstacle = Obstacle::solid(0.0, 0.5, 0.0, 1.0, 1.0, 2.0);
 
-        let result = physics.resolve_horizontal_collision(&player, &vel_x, &obstacle, obstacle.kind.clone());
+        let result =
+            physics.resolve_horizontal_collision(&player, &vel_x, &obstacle, obstacle.kind.clone());
 
         assert_eq!(result, CollisionResult::Right);
     }
@@ -359,7 +488,8 @@ mod tests {
         let vel_x = -1.0;
         let obstacle = Obstacle::solid(0.0, 0.5, 0.0, 1.0, 1.0, 2.0);
 
-        let result = physics.resolve_horizontal_collision(&player, &vel_x, &obstacle, obstacle.kind.clone());
+        let result =
+            physics.resolve_horizontal_collision(&player, &vel_x, &obstacle, obstacle.kind.clone());
 
         assert_eq!(result, CollisionResult::Left);
     }
@@ -371,7 +501,8 @@ mod tests {
         let vel_x = 1.0;
         let obstacle = Obstacle::solid(5.0, 0.5, 0.0, 1.0, 1.0, 2.0);
 
-        let result = physics.resolve_horizontal_collision(&player, &vel_x, &obstacle, obstacle.kind.clone());
+        let result =
+            physics.resolve_horizontal_collision(&player, &vel_x, &obstacle, obstacle.kind.clone());
 
         assert_eq!(result, CollisionResult::None);
     }
@@ -383,7 +514,8 @@ mod tests {
         let vel_x = 1.0;
         let obstacle = Obstacle::solid(0.0, 0.5, 0.0, 1.0, 1.0, 2.0);
 
-        let result = physics.resolve_horizontal_collision(&player, &vel_x, &obstacle, obstacle.kind.clone());
+        let result =
+            physics.resolve_horizontal_collision(&player, &vel_x, &obstacle, obstacle.kind.clone());
 
         assert_eq!(result, CollisionResult::None);
     }
@@ -395,41 +527,75 @@ mod tests {
         let vel_y = -2.0;
         let obstacle = Obstacle::solid(0.0, 2.05, 0.0, 4.0, 0.1, 4.0);
 
-        let result = physics.resolve_platform_collision(&player, &vel_y, &obstacle, obstacle.kind.clone());
+        let result =
+            physics.resolve_platform_collision(&player, &vel_y, &obstacle, obstacle.kind.clone());
 
         assert_eq!(result, CollisionResult::None);
     }
 
     /// Simple test player that implements PhysicsEntity for physics tests.
     struct TestPlayer {
-        data: PhysicsData,
+        data: EntityPhysicsData,
     }
 
     impl TestPlayer {
         fn new(py: f32, size: f32) -> Self {
-            Self { data: PhysicsData { x: 0.0, y: py, z: 0.0, vel_x: 0.0, vel_y: 0.0, vel_z: 0.0, size } }
+            Self {
+                data: EntityPhysicsData {
+                    x: 0.0,
+                    y: py,
+                    z: 0.0,
+                    vel_x: 0.0,
+                    vel_y: 0.0,
+                    vel_z: 0.0,
+                    size,
+                    is_grounded: false,
+                },
+            }
         }
         fn new_at(px: f32, py: f32, pz: f32, size: f32) -> Self {
-            Self { data: PhysicsData { x: px, y: py, z: pz, vel_x: 0.0, vel_y: 0.0, vel_z: 0.0, size } }
+            Self {
+                data: EntityPhysicsData {
+                    x: px,
+                    y: py,
+                    z: pz,
+                    vel_x: 0.0,
+                    vel_y: 0.0,
+                    vel_z: 0.0,
+                    size,
+                    is_grounded: false,
+                },
+            }
         }
     }
 
     impl PhysicsEntity for TestPlayer {
-        fn physics_data(&self) -> &PhysicsData { &self.data }
-        fn physics_data_mut(&mut self) -> &mut PhysicsData { &mut self.data }
-        fn update_position(&mut self, dt: f32) {
-            self.data.x += self.data.vel_x * dt;
-            self.data.y += self.data.vel_y * dt;
-            self.data.z += self.data.vel_z * dt;
+        fn physics_data(&self) -> &EntityPhysicsData {
+            &self.data
+        }
+        fn physics_data_mut(&mut self) -> &mut EntityPhysicsData {
+            &mut self.data
         }
     }
 
     impl Aabb for TestPlayer {
-        fn min_x(&self) -> f32 { self.data.x - self.data.size / 2.0 }
-        fn max_x(&self) -> f32 { self.data.x + self.data.size / 2.0 }
-        fn min_y(&self) -> f32 { self.data.y }
-        fn max_y(&self) -> f32 { self.data.y + self.data.size }
-        fn min_z(&self) -> f32 { self.data.z - self.data.size / 2.0 }
-        fn max_z(&self) -> f32 { self.data.z + self.data.size / 2.0 }
+        fn min_x(&self) -> f32 {
+            self.data.x - self.data.size / 2.0
+        }
+        fn max_x(&self) -> f32 {
+            self.data.x + self.data.size / 2.0
+        }
+        fn min_y(&self) -> f32 {
+            self.data.y
+        }
+        fn max_y(&self) -> f32 {
+            self.data.y + self.data.size
+        }
+        fn min_z(&self) -> f32 {
+            self.data.z - self.data.size / 2.0
+        }
+        fn max_z(&self) -> f32 {
+            self.data.z + self.data.size / 2.0
+        }
     }
 }

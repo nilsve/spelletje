@@ -1,9 +1,9 @@
-use crate::player::Player;
-use crate::obstacle::{Aabb, Obstacle, is_colliding};
-use crate::physics::{PhysicsImpl, CollisionResult};
-use crate::input::Input;
-use crate::projectile::Projectile;
 use crate::enemy::Enemy;
+use crate::input::Input;
+use crate::obstacle::{Aabb, Obstacle, is_colliding};
+use crate::physics::{CollisionResult, PhysicsImpl};
+use crate::player::Player;
+use crate::projectile::Projectile;
 
 /// Temporary AABB wrapper for player collision checks.
 struct PlayerAabb {
@@ -14,12 +14,24 @@ struct PlayerAabb {
 }
 
 impl Aabb for PlayerAabb {
-    fn min_x(&self) -> f32 { self.x - self.size }
-    fn max_x(&self) -> f32 { self.x + self.size }
-    fn min_y(&self) -> f32 { self.y - self.size }
-    fn max_y(&self) -> f32 { self.y + self.size }
-    fn min_z(&self) -> f32 { self.z - self.size }
-    fn max_z(&self) -> f32 { self.z + self.size }
+    fn min_x(&self) -> f32 {
+        self.x - self.size
+    }
+    fn max_x(&self) -> f32 {
+        self.x + self.size
+    }
+    fn min_y(&self) -> f32 {
+        self.y - self.size
+    }
+    fn max_y(&self) -> f32 {
+        self.y + self.size
+    }
+    fn min_z(&self) -> f32 {
+        self.z - self.size
+    }
+    fn max_z(&self) -> f32 {
+        self.z + self.size
+    }
 }
 
 /// Manages the game world: entities, obstacles, and their interactions.
@@ -49,7 +61,8 @@ impl World {
     }
 
     pub fn add_platform(&mut self, x: f32, y: f32, z: f32, width: f32, height: f32, depth: f32) {
-        self.obstacles.push(Obstacle::platform(x, y, z, width, height, depth));
+        self.obstacles
+            .push(Obstacle::platform(x, y, z, width, height, depth));
     }
 
     pub fn add_enemy(&mut self, enemy: Enemy) {
@@ -71,7 +84,7 @@ impl World {
                 continue;
             }
 
-                let mut hit = false;
+            let mut hit = false;
             for obstacle in &self.obstacles {
                 if is_colliding(&projectile, obstacle) {
                     hit = true;
@@ -106,65 +119,27 @@ impl World {
             entity.update(input, physics, dt);
         }
 
-        for entity in &mut self.entities {
-            for obstacle in &self.obstacles {
-                let collision = physics.resolve_platform_collision(
-                    entity,
-                    &entity.physics_data.vel_y,
-                    obstacle,
-                    obstacle.kind.clone(),
-                );
-                if collision == CollisionResult::Bottom {
-                    entity.physics_data.y = obstacle.max_y();
-                    entity.physics_data.vel_y = 0.0;
-                    entity.set_grounded(true);
-                    physics.apply_friction(&mut entity.physics_data.vel_x, dt);
-                }
-
-                if collision == CollisionResult::Top {
-                    entity.physics_data.y = obstacle.min_y() - entity.physics_data.size;
-                    entity.physics_data.vel_y = 0.0;
-                }
-
-                let h_collision = physics.resolve_horizontal_collision(
-                    entity,
-                    &entity.physics_data.vel_x,
-                    obstacle,
-                    obstacle.kind.clone(),
-                );
-                match h_collision {
-                    CollisionResult::Right => {
-                        if entity.physics_data.x < obstacle.x {
-                            entity.physics_data.x = obstacle.min_x() - entity.physics_data.size / 2.0;
-                        } else {
-                            entity.physics_data.x = obstacle.max_x() - entity.physics_data.size / 2.0;
-                        }
-                        entity.physics_data.vel_x = 0.0;
-                    }
-                    CollisionResult::Left => {
-                        if entity.physics_data.x < obstacle.x {
-                            entity.physics_data.x = obstacle.min_x() - entity.physics_data.size / 2.0;
-                        } else {
-                            entity.physics_data.x = obstacle.max_x() + entity.physics_data.size / 2.0;
-                        }
-                        entity.physics_data.vel_x = 0.0;
-                    }
-                    _ => {}
-                }
-            }
-        }
-
         // Update enemies and collect projectiles
         let mut enemy_projectiles = Vec::new();
         for enemy in &mut self.enemies {
             if let Some(player) = self.entities.first() {
-                enemy.update_ai(player, dt);
-                
+                enemy.update_ai(player, dt, physics);
+
                 if let Some(projectile) = enemy.try_shoot(player) {
                     enemy_projectiles.push(projectile);
                 }
             }
         }
+
+        self.entities
+            .iter_mut()
+            .for_each(|e| physics.update(e, &self.obstacles, dt));
+        self.enemies
+            .iter_mut()
+            .for_each(|e| physics.update(e, &self.obstacles, dt));
+        self.projectiles
+            .iter_mut()
+            .for_each(|e| physics.update(e, &self.obstacles, dt));
 
         // Remove dead enemies
         self.enemies.retain(|e| e.alive);
@@ -210,8 +185,8 @@ impl Default for World {
 
 #[cfg(test)]
 mod tests {
-    use crate::obstacle::ObstacleKind;
     use super::*;
+    use crate::obstacle::ObstacleKind;
     use crate::physics::PhysicsImpl;
 
     fn default_input() -> Input {
@@ -236,7 +211,7 @@ mod tests {
     #[test]
     fn test_add_and_remove_entity() {
         let mut world = World::new();
-        world.add_entity(Player::new());
+        world.add_entity(Player::default());
         assert_eq!(world.entity_count(), 1);
 
         world.remove_entity(0);
@@ -264,7 +239,7 @@ mod tests {
     #[test]
     fn test_entity_updates_in_world() {
         let mut world = World::new();
-        let mut player = Player::new();
+        let mut player = Player::default();
         player.physics_data.vel_x = 5.0;
         world.add_entity(player);
 
@@ -278,7 +253,7 @@ mod tests {
     #[test]
     fn test_obstacle_collision_with_world() {
         let mut world = World::new();
-        let mut player = Player::new();
+        let mut player = Player::default();
         player.physics_data.y = 5.0;
         player.physics_data.vel_y = -10.0;
         world.add_entity(player);
@@ -295,11 +270,11 @@ mod tests {
     #[test]
     fn test_multiple_entities_update() {
         let mut world = World::new();
-        let mut player1 = Player::new();
+        let mut player1 = Player::default();
         player1.physics_data.vel_x = 5.0;
         world.add_entity(player1);
 
-        let mut player2 = Player::new();
+        let mut player2 = Player::default();
         player2.physics_data.vel_z = -3.0;
         world.add_entity(player2);
 
@@ -323,7 +298,7 @@ mod tests {
     #[test]
     fn test_platform_no_horizontal_collision() {
         let mut world = World::new();
-        let mut player = Player::new();
+        let mut player = Player::default();
         player.physics_data.x = 3.0;
         player.physics_data.vel_x = 2.0;
         player.physics_data.y = 1.0;
@@ -393,7 +368,7 @@ mod tests {
     #[test]
     fn test_projectile_collides_with_player() {
         let mut world = World::new();
-        let mut player = Player::new();
+        let mut player = Player::default();
         player.physics_data.x = 5.0;
         player.physics_data.y = 0.5;
         world.add_entity(player);
@@ -409,7 +384,7 @@ mod tests {
     #[test]
     fn test_update_all_includes_projectile_update() {
         let mut world = World::new();
-        let mut player = Player::new();
+        let mut player = Player::default();
         player.physics_data.y = 10.0;
         world.add_entity(player);
         world.add_platform(0.0, -0.25, 0.0, 100.0, 0.5, 100.0);

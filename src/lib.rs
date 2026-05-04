@@ -1,6 +1,6 @@
 pub mod physics;
 pub use physics::PhysicsEntity;
-pub use physics::PhysicsData;
+pub use physics::EntityPhysicsData;
 pub use physics::PhysicsImpl;
 pub mod player;
 pub mod obstacle;

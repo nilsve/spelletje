@@ -18,7 +18,7 @@ use spelletje_mac::obstacle::Obstacle;
 #[cfg(feature = "gui")]
 use spelletje_mac::projectile::Projectile;
 #[cfg(feature = "gui")]
-use spelletje_mac::enemy::{Enemy, EnemyConfig};
+use spelletje_mac::enemy::{Enemy};
 
 #[cfg(feature = "gui")]
 fn draw_obstacle(obstacle: &Obstacle, color: Color) {
@@ -51,9 +51,9 @@ fn draw_enemy(enemy: &Enemy) {
     let s = enemy.size();
     let size = vec3(s, s, s * 0.8);
     let pos_vec = vec3(pos.0, pos.1 + s / 2.0, pos.2);
-    let color = if enemy.config.health > 30.0 {
+    let color = if enemy.health > 30.0 {
         RED
-    } else if enemy.config.health > 15.0 {
+    } else if enemy.health > 15.0 {
         ORANGE
     } else {
         Color::new(0.4, 0.0, 0.0, 1.0)
@@ -70,20 +70,20 @@ async fn game_loop() {
     world.add_obstacle(Obstacle::solid(5.0, 1.5, 0.0, 4.0, 0.5, 4.0));
     world.add_obstacle(Obstacle::solid(-5.0, 2.5, 0.0, 3.0, 0.5, 3.0));
 
-    let player = Player::new();
+    let player = Player::default();
     world.add_entity(player);
 
     // Spawn enemies
-    world.add_enemy(Enemy::new(EnemyConfig::default()));
+    world.add_enemy(Enemy::default());
     world.enemies[0].physics_data.x = 10.0;
     world.enemies[0].physics_data.z = 5.0;
     
-    let mut enemy2 = Enemy::new(EnemyConfig::default());
+    let mut enemy2 = Enemy::default();
     enemy2.physics_data.x = -8.0;
     enemy2.physics_data.z = 8.0;
-    enemy2.config.health = 80.0;
-    enemy2.config.damage = 15.0;
-    enemy2.config.shoot_interval = 1.5;
+    enemy2.health = 80.0;
+    enemy2.damage = 15.0;
+    enemy2.shoot_interval = 1.5;
     world.add_enemy(enemy2);
 
     let physics = PhysicsImpl::new();

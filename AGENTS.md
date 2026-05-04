@@ -63,7 +63,7 @@ world.add_platform(Platform::new(0.0, -0.25, 0.0, 100.0, 0.5, 100.0)); // ground
 world.add_platform(Platform::new(5.0, 2.0, 0.0, 4.0, 0.5, 4.0));        // elevated platform
 
 // Add player with custom config
-let mut player = Player::new();
+let mut player = Player::default();
 player.config.acceleration = 15.0;
 player.config.max_speed = 8.0;
 world.add_entity(player);
@@ -201,7 +201,7 @@ All modules have comprehensive tests under `#[cfg(test)]`:
 // Test a specific sequence
 let mut world = World::new();
 world.add_platform(Platform::new(0.0, -0.25, 0.0, 100.0, 0.5, 100.0));
-world.add_entity(Player::new());
+world.add_entity(Player::default());
 
 // Simulate frames
 for _ in 0..60 { // ~1 second

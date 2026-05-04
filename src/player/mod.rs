@@ -1,50 +1,13 @@
-use crate::physics::{PhysicsConfig, PhysicsEntity, PhysicsImpl, PhysicsData};
 use crate::input::Input;
 use crate::obstacle::Aabb;
+use crate::physics::{EntityPhysicsData, GlobalPhysicsConfig, PhysicsEntity, PhysicsImpl};
 use crate::projectile::Projectile;
 use crate::shooter::Shooter;
 
 #[derive(Clone, Debug)]
-pub struct PlayerConfig {
-    pub speed: f32,
-    pub acceleration: f32,
-    pub friction: f32,
-    pub gravity: f32,
-    pub jump_force: f32,
-    pub friction_threshold: f32,
-}
-
-impl Default for PlayerConfig {
-    fn default() -> Self {
-        Self {
-            speed: 5.0,
-            acceleration: 20.0,
-            friction: 5.0,
-            gravity: 20.0,
-            jump_force: 10.0,
-            friction_threshold: 0.01,
-        }
-    }
-}
-
-impl PlayerConfig {
-    pub fn to_physics_config(&self) -> PhysicsConfig {
-        PhysicsConfig {
-            gravity: self.gravity,
-            jump_force: self.jump_force,
-            max_speed: self.speed,
-            acceleration: self.acceleration,
-            friction: self.friction,
-            friction_threshold: self.friction_threshold,
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
 pub struct Player {
-    pub physics_data: PhysicsData,
-    pub grounded: bool,
-    pub config: PlayerConfig,
+    pub jump_force: f32,
+    pub physics_data: EntityPhysicsData,
     pub gun_angle: f32,
     pub gun_pitch: f32,
 }
@@ -71,52 +34,25 @@ impl Aabb for Player {
 }
 
 impl Player {
-    pub fn new() -> Self {
+    pub fn with_physics_config(physics_data: EntityPhysicsData) -> Self {
         Self {
-            physics_data: PhysicsData {
-                x: 0.0,
-                y: 0.0,
-                z: 0.0,
-                vel_x: 0.0,
-                vel_y: 0.0,
-                vel_z: 0.0,
-                size: 1.0,
-            },
-            grounded: true,
-            config: PlayerConfig::default(),
-            gun_angle: 0.0,
-            gun_pitch: 0.0,
-        }
-    }
-
-    pub fn with_config(config: PlayerConfig) -> Self {
-        Self {
-            physics_data: PhysicsData {
-                x: 0.0,
-                y: 0.0,
-                z: 0.0,
-                vel_x: 0.0,
-                vel_y: 0.0,
-                vel_z: 0.0,
-                size: 1.0,
-            },
-            grounded: true,
-            config,
+            physics_data,
+            jump_force: 10.0,
             gun_angle: 0.0,
             gun_pitch: 0.0,
         }
     }
 
     pub fn is_grounded(&self) -> bool {
-        self.grounded
-    }
-
-    pub fn set_grounded(&mut self, grounded: bool) {
-        self.grounded = grounded;
+        self.physics_data().is_grounded
     }
 
     pub fn pos(&self) -> (f32, f32, f32) {
-        (self.physics_data.x, self.physics_data.y, self.physics_data.z)
+        (
+            self.physics_data.x,
+            self.physics_data.y,
+            self.physics_data.z,
+        )
     }
 
     pub fn size(&self) -> f32 {
@@ -153,7 +89,6 @@ impl Player {
     }
 
     pub fn update(&mut self, input: &Input, physics: &PhysicsImpl, dt: f32) {
-
         let mut input_x = 0.0;
         if input.left {
             input_x -= 1.0;
@@ -163,39 +98,18 @@ impl Player {
         }
 
         if input_x != 0.0 {
-            physics.apply_acceleration(&mut self.physics_data.vel_x, input_x, dt);
+            physics.apply_acceleration_x(&mut self.physics_data, input_x, dt);
         } else {
             physics.apply_friction(&mut self.physics_data.vel_x, dt);
         }
 
         physics.apply_gravity(&mut self.physics_data.vel_y, dt);
 
-        if self.physics_data.vel_y > 0.0 {
-            self.set_grounded(false);
-        }
-
-        if self.physics_data.y <= self.config.friction_threshold && self.physics_data.vel_y == 0.0 && !input.jump {
-            self.set_grounded(true);
-        }
-
         if input.jump && self.is_grounded() {
             physics.apply_jump(&mut self.physics_data.vel_y);
-            self.set_grounded(false);
-        }
-
-        let mut input_z = 0.0;
-        if input.backward {
-            input_z -= 1.0;
-        }
-
-        if input_z != 0.0 {
-            physics.apply_acceleration(&mut self.physics_data.vel_z, input_z, dt);
-        } else {
-            physics.apply_friction(&mut self.physics_data.vel_z, dt);
         }
 
         physics.clamp_speed(&mut self.physics_data.vel_x);
-        physics.clamp_speed(&mut self.physics_data.vel_z);
 
         self.update_position(dt);
     }
@@ -216,29 +130,22 @@ impl Shooter for Player {
 }
 
 impl PhysicsEntity for Player {
-    fn physics_data(&self) -> &PhysicsData { &self.physics_data }
-    fn physics_data_mut(&mut self) -> &mut PhysicsData { &mut self.physics_data }
-    fn update_position(&mut self, dt: f32) {
-        self.physics_data.x += self.physics_data.vel_x * dt;
-        self.physics_data.y += self.physics_data.vel_y * dt;
-        self.physics_data.z += self.physics_data.vel_z * dt;
+    fn physics_data(&self) -> &EntityPhysicsData {
+        &self.physics_data
+    }
+    fn physics_data_mut(&mut self) -> &mut EntityPhysicsData {
+        &mut self.physics_data
     }
 }
 
 impl Default for Player {
     fn default() -> Self {
         Self {
-            physics_data: PhysicsData {
-                x: 0.0,
-                y: 0.0,
-                z: 0.0,
-                vel_x: 0.0,
-                vel_y: 0.0,
-                vel_z: 0.0,
+            physics_data: EntityPhysicsData {
                 size: 1.0,
+                ..EntityPhysicsData::default()
             },
-            grounded: false,
-            config: PlayerConfig::default(),
+            jump_force: 10.0,
             gun_angle: 0.0,
             gun_pitch: 0.0,
         }
@@ -274,7 +181,7 @@ mod tests {
 
     #[test]
     fn test_new_player_starts_at_origin() {
-        let player = Player::new();
+        let player = Player::default();
         assert!((player.physics_data.x - 0.0).abs() < 0.01);
         assert!((player.physics_data.y - 0.0).abs() < 0.01);
         assert!((player.physics_data.z - 0.0).abs() < 0.01);
@@ -285,20 +192,20 @@ mod tests {
 
     #[test]
     fn test_player_is_grounded_when_at_y_zero() {
-        let mut player = Player::new();
+        let player = Player::default();
         assert!(player.is_grounded());
     }
 
     #[test]
     fn test_player_not_grounded_when_above_ground() {
-        let mut player = Player::new();
-        player.grounded = false;
+        let mut player = Player::default();
+        player.physics_data.is_grounded = false;
         assert!(!player.is_grounded());
     }
 
     #[test]
     fn test_horizontal_acceleration() {
-        let mut player = Player::new();
+        let mut player = Player::default();
         let input = Input {
             right: true,
             ..default_input()
@@ -313,7 +220,7 @@ mod tests {
 
     #[test]
     fn test_friction_stops_player_when_no_input() {
-        let mut player = Player::new();
+        let mut player = Player::default();
         player.physics_data.vel_x = 5.0;
         let input = default_input();
         let physics = PhysicsImpl::new();
@@ -328,7 +235,7 @@ mod tests {
 
     #[test]
     fn test_jump_sets_vertical_velocity() {
-        let mut player = Player::new();
+        let mut player = Player::default();
         assert!(player.is_grounded());
         let physics = PhysicsImpl::new();
 
@@ -339,9 +246,9 @@ mod tests {
 
     #[test]
     fn test_cannot_jump_when_airborne() {
-        let mut player = Player::new();
+        let mut player = Player::default();
         player.physics_data.y = 1.0;
-        player.grounded = false;
+        player.physics_data.is_grounded = false;
         assert!(!player.is_grounded());
 
         let physics = PhysicsImpl::new();
@@ -356,7 +263,7 @@ mod tests {
 
     #[test]
     fn test_max_speed_is_enforced() {
-        let mut player = Player::new();
+        let mut player = Player::default();
         let input = Input {
             right: true,
             ..default_input()
@@ -373,7 +280,7 @@ mod tests {
 
     #[test]
     fn test_negative_horizontal_movement() {
-        let mut player = Player::new();
+        let mut player = Player::default();
         let input = Input {
             left: true,
             ..default_input()
@@ -388,7 +295,7 @@ mod tests {
 
     #[test]
     fn test_z_axis_movement() {
-        let mut player = Player::new();
+        let mut player = Player::default();
         let input = Input {
             backward: true,
             ..default_input()
@@ -403,7 +310,7 @@ mod tests {
 
     #[test]
     fn test_position_updates_with_velocity() {
-        let mut player = Player::new();
+        let mut player = Player::default();
         player.physics_data.vel_x = 5.0;
         let input = default_input();
         let physics = PhysicsImpl::new();
@@ -416,7 +323,7 @@ mod tests {
 
     #[test]
     fn test_gravity_affects_vertical_position() {
-        let mut player = Player::new();
+        let mut player = Player::default();
         let jump_input = grounded_input();
         let physics = PhysicsImpl::new();
 
@@ -436,12 +343,10 @@ mod tests {
 
     #[test]
     fn test_custom_config_is_applied() {
-        let config = PlayerConfig {
-            jump_force: 20.0,
-            speed: 10.0,
-            ..PlayerConfig::default()
-        };
-        let mut player = Player::with_config(config);
+        let mut player = Player::default();
+
+        player.jump_force = 20.0;
+
         let physics = PhysicsImpl::new();
 
         player.update(&grounded_input(), &physics, 0.016);
@@ -451,7 +356,7 @@ mod tests {
 
     #[test]
     fn test_velocity_decreases_to_zero_with_friction() {
-        let mut player = Player::new();
+        let mut player = Player::default();
         player.physics_data.vel_x = 10.0;
         let input = default_input();
         let physics = PhysicsImpl::new();
@@ -464,13 +369,13 @@ mod tests {
 
     #[test]
     fn test_gun_angle_default_is_zero() {
-        let player = Player::new();
+        let player = Player::default();
         assert!((player.gun_angle - 0.0).abs() < 0.01);
     }
 
     #[test]
     fn test_gun_end_points_forward_by_default() {
-        let player = Player::new();
+        let player = Player::default();
         let end = player.gun_end();
         // With gun_angle=0, should point in +Z direction
         assert!((end.0 - player.physics_data.x).abs() < 0.01);
@@ -480,7 +385,7 @@ mod tests {
 
     #[test]
     fn test_gun_end_points_right_at_pi_over_2() {
-        let player = Player::new();
+        let player = Player::default();
         let mut p = player;
         p.gun_angle = std::f32::consts::FRAC_PI_2;
         let end = p.gun_end();
@@ -490,7 +395,7 @@ mod tests {
 
     #[test]
     fn test_gun_end_points_left_at_minus_pi_over_2() {
-        let player = Player::new();
+        let player = Player::default();
         let mut p = player;
         p.gun_angle = -std::f32::consts::FRAC_PI_2;
         let end = p.gun_end();
@@ -500,7 +405,7 @@ mod tests {
 
     #[test]
     fn test_shoot_direction_normalized() {
-        let player = Player::new();
+        let player = Player::default();
         let dir = player.shoot_direction();
         let len = (dir.0 * dir.0 + dir.1 * dir.1 + dir.2 * dir.2).sqrt();
         assert!((len - 1.0).abs() < 0.01);
@@ -510,7 +415,7 @@ mod tests {
 
     #[test]
     fn test_shoot_direction_with_positive_pitch() {
-        let mut player = Player::new();
+        let mut player = Player::default();
         player.gun_pitch = 0.3;
         let dir = player.shoot_direction();
         assert!(dir.1 > 0.0);
@@ -518,7 +423,7 @@ mod tests {
 
     #[test]
     fn test_shoot_direction_with_negative_pitch() {
-        let mut player = Player::new();
+        let mut player = Player::default();
         player.gun_pitch = -0.3;
         let dir = player.shoot_direction();
         assert!(dir.1 < 0.0);
@@ -526,7 +431,7 @@ mod tests {
 
     #[test]
     fn test_shoot_direction_matches_gun_angle() {
-        let player = Player::new();
+        let player = Player::default();
         let mut p = player;
         p.gun_angle = std::f32::consts::FRAC_PI_4;
         let dir = p.shoot_direction();
@@ -536,7 +441,7 @@ mod tests {
 
     #[test]
     fn test_fire_creates_projectile() {
-        let player = Player::new();
+        let player = Player::default();
         let projectile = player.fire();
         assert!(projectile.is_alive());
         assert!((projectile.damage - 10.0).abs() < 0.1);
@@ -549,17 +454,18 @@ mod tests {
 
     #[test]
     fn test_fire_projectile_has_velocity() {
-        let player = Player::new();
+        let player = Player::default();
         let projectile = player.fire();
         let total_vel = (projectile.physics_data.vel_x * projectile.physics_data.vel_x
             + projectile.physics_data.vel_y * projectile.physics_data.vel_y
-            + projectile.physics_data.vel_z * projectile.physics_data.vel_z).sqrt();
+            + projectile.physics_data.vel_z * projectile.physics_data.vel_z)
+            .sqrt();
         assert!((total_vel - 15.0).abs() < 0.1);
     }
 
     #[test]
     fn test_fire_projectile_aims_correctly() {
-        let player = Player::new();
+        let player = Player::default();
         let mut p = player;
         p.gun_angle = std::f32::consts::FRAC_PI_2; // point right
         let projectile = p.fire();
