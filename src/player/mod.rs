@@ -41,10 +41,9 @@ impl Player {
     /// Returns the 3D position at the tip of the gun for rendering.
     pub fn gun_end(&self) -> (f32, f32, f32) {
         const GUN_LENGTH: f32 = 1.5;
-        let cos_pitch = f32::cos(self.gun_pitch);
-        let dir_x = f32::sin(self.gun_angle) * cos_pitch;
+        let dir_x = f32::sin(self.gun_angle);
         let dir_y = f32::sin(self.gun_pitch);
-        let dir_z = f32::cos(self.gun_angle) * cos_pitch;
+        let dir_z = 1.0;
         (
             self.physics_data.x + dir_x * GUN_LENGTH,
             self.physics_data.y + self.physics_data.size / 2.0 + dir_y * GUN_LENGTH,
@@ -57,14 +56,14 @@ impl Player {
         let cos_pitch = f32::cos(self.gun_pitch);
         let dir_x = f32::sin(self.gun_angle) * cos_pitch;
         let dir_y = f32::sin(self.gun_pitch);
-        let dir_z = f32::cos(self.gun_angle) * cos_pitch;
+        let dir_z = 0.; //f32::cos(self.gun_angle) * cos_pitch;
         let len = (dir_x * dir_x + dir_y * dir_y + dir_z * dir_z).sqrt();
         (dir_x / len, dir_y / len, dir_z / len)
     }
 
     /// Creates a projectile fired from the gun tip in the current aim direction.
     pub fn fire(&self) -> Projectile {
-        self.fire_with_direction(self.shoot_direction())
+        self.fire_at_direction(self.shoot_direction())
     }
 
     pub fn update(&mut self, input: &Input, physics: &Physics, dt: f32) {

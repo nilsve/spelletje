@@ -7,7 +7,6 @@
 ///
 /// The trait provides `fire_with_direction()` as the shared implementation.
 /// Concrete types supply their own origin, speed, and damage.
-
 use crate::projectile::Projectile;
 
 pub trait Shooter {
@@ -20,16 +19,36 @@ pub trait Shooter {
     /// Damage dealt by projectiles.
     fn damage(&self) -> f32;
 
-    /// Creates a projectile given a direction vector.
-    /// This is the shared implementation used by both Player and Enemy.
-    fn fire_with_direction(&self, dir: (f32, f32, f32)) -> Projectile {
+    /// Returns the normalized direction from shoot origin toward the target coordinate.
+    fn get_direction(&self, target_coord: (f32, f32, f32)) -> (f32, f32, f32) {
+        let (ox, oy, oz) = self.shoot_origin();
+        let dx = target_coord.0 - ox;
+        let dy = target_coord.1 - oy;
+        let dz = target_coord.2 - oz;
+        let len = (dx * dx + dy * dy + dz * dz).sqrt().max(0.01);
+        (dx / len, dy / len, dz / len)
+    }
+
+    fn fire_at_direction(&self, direction: (f32, f32, f32)) -> Projectile {
         let origin = self.shoot_origin();
         let speed = self.projectile_speed();
         let damage = self.damage();
+
+        let len = (direction.0 * direction.0 + direction.1 * direction.1 + direction.2 * direction.2).sqrt().max(0.01);
         Projectile::new(
-            origin.0, origin.1, origin.2,
-            dir.0 * speed, dir.1 * speed, dir.2 * speed,
+            origin.0,
+            origin.1,
+            origin.2,
+            direction.0 / len * speed,
+            direction.1 / len * speed,
+            direction.2 / len * speed,
             damage,
         )
+    }
+
+    fn fire_at_coord(&self, target_coord: (f32, f32, f32)) -> Projectile {
+        let direction = self.get_direction(target_coord);
+
+        self.fire_at_direction(direction)
     }
 }

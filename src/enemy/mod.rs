@@ -48,24 +48,9 @@ impl Enemy {
         self.physics_data.size
     }
 
-    /// Returns the shoot direction toward the player.
-    fn shoot_direction_toward(
-        &self,
-        target_x: f32,
-        target_y: f32,
-        target_z: f32,
-    ) -> (f32, f32, f32) {
-        let dx = target_x - self.physics_data.x;
-        let dy = target_y - (self.physics_data.y + self.physics_data.size / 2.0);
-        let dz = target_z - self.physics_data.z;
-        let len = (dx * dx + dy * dy + dz * dz).sqrt().max(0.01);
-        (dx / len, dy / len, dz / len)
-    }
-
     /// Creates a projectile fired at the given target position.
     pub fn shoot_at(&self, target_x: f32, target_y: f32, target_z: f32) -> Projectile {
-        let dir = self.shoot_direction_toward(target_x, target_y, target_z);
-        self.fire_with_direction(dir)
+        self.fire_at_coord((target_x, target_y, target_z))
     }
 
     /// Returns the shoot origin point for the enemy.
@@ -113,15 +98,13 @@ impl Enemy {
 
         physics.apply_gravity(&mut self.physics_data_mut().vel_y, dt);
 
-        // // Shooting timer
-        self.shoot_timer += dt;
-        if self.shoot_timer >= self.shoot_interval && dist < self.shoot_range {
-            self.shoot_timer = 0.0;
+        if self.shoot_timer > 0. {
+            self.shoot_timer -= dt;
         }
     }
 
     /// Checks if enemy should shoot and creates projectile if so.
-    pub fn try_shoot(&self, player: &Player) -> Option<Projectile> {
+    pub fn try_shoot(&mut self, player: &Player) -> Option<Projectile> {
         if !self.alive {
             return None;
         }
@@ -132,7 +115,8 @@ impl Enemy {
         let dz = player.physics_data().z - self.physics_data.z;
         let dist = (dx * dx + dy * dy + dz * dz).sqrt();
 
-        if self.shoot_timer >= self.shoot_interval && dist < self.shoot_range {
+        if self.shoot_timer <= 0. && dist < self.shoot_range {
+            self.shoot_timer = self.shoot_interval;
             Some(self.shoot_at(
                 player.physics_data().x,
                 player.physics_data().y + player.physics_data().size / 2.0,

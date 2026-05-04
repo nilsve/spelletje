@@ -55,7 +55,7 @@ pub fn run_cli(input_str: &str) {
     let physics = Physics::new();
     println!("Running CLI simulation with input: {}", input_str);
     println!("Sequence: {:?}", sequence);
-    let initial = &world.entities[0];
+    let initial = &world.players[0];
     let physics_data = initial.physics_data();
     println!(
         "{{\"x\":{:.2},\"y\":{:.2},\"z\":{:.2},\"vel_x\":{:.2},\"vel_y\":{:.2},\"vel_z\":{:.2},\"grounded\":{}}}",
@@ -79,7 +79,7 @@ pub fn run_cli(input_str: &str) {
 
         // Handle shooting
         if input.shoot {
-            let projectile = world.entities[0].fire();
+            let projectile = world.players[0].fire();
             world.add_projectile(projectile);
         }
 
@@ -91,9 +91,9 @@ pub fn run_cli(input_str: &str) {
                 "Frame {}: keys={:?} pos=({:.2}, {:.2}, {:.2}) projectiles={}",
                 frame_count,
                 current_keys,
-                world.entities[0].physics_data().x,
-                world.entities[0].physics_data().y,
-                world.entities[0].physics_data().z,
+                world.players[0].physics_data().x,
+                world.players[0].physics_data().y,
+                world.players[0].physics_data().z,
                 world.projectile_count()
             );
         }
@@ -107,9 +107,9 @@ pub fn run_cli(input_str: &str) {
         if seq_idx >= sequence.len() {
             println!(
                 "Simulation complete. Final position: ({:.2}, {:.2}, {:.2})",
-                world.entities[0].physics_data().x,
-                world.entities[0].physics_data().y,
-                world.entities[0].physics_data().z
+                world.players[0].physics_data().x,
+                world.players[0].physics_data().y,
+                world.players[0].physics_data().z
             );
             break;
         }

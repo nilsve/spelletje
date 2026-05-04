@@ -37,7 +37,7 @@ impl Aabb for PlayerAabb {
 
 /// Manages the game world: entities, obstacles, and their interactions.
 pub struct World {
-    pub entities: Vec<Player>,
+    pub players: Vec<Player>,
     pub obstacles: Vec<Obstacle>,
     pub projectiles: Vec<Projectile>,
     pub enemies: Vec<Enemy>,
@@ -46,7 +46,7 @@ pub struct World {
 impl World {
     pub fn new() -> Self {
         Self {
-            entities: Vec::new(),
+            players: Vec::new(),
             obstacles: Vec::new(),
             projectiles: Vec::new(),
             enemies: Vec::new(),
@@ -54,7 +54,7 @@ impl World {
     }
 
     pub fn add_entity(&mut self, entity: Player) {
-        self.entities.push(entity);
+        self.players.push(entity);
     }
 
     pub fn add_obstacle(&mut self, obstacle: Obstacle) {
@@ -94,7 +94,7 @@ impl World {
             }
 
             if !hit {
-                for entity in &self.entities {
+                for entity in &self.players {
                     let player_aabb = PlayerAabb {
                         x: entity.physics_data().x,
                         y: entity.physics_data().y + entity.physics_data().size / 2.0,
@@ -116,14 +116,14 @@ impl World {
     }
 
     pub fn update_all(&mut self, input: &Input, physics: &Physics, dt: f32) {
-        for entity in &mut self.entities {
+        for entity in &mut self.players {
             entity.update(input, physics, dt);
         }
 
         // Update enemies and collect projectiles
         let mut enemy_projectiles = Vec::new();
         for enemy in &mut self.enemies {
-            if let Some(player) = self.entities.first() {
+            if let Some(player) = self.players.first() {
                 enemy.update_ai(player, dt, physics);
 
                 if let Some(projectile) = enemy.try_shoot(player) {
@@ -132,13 +132,13 @@ impl World {
             }
         }
 
-        self.entities.iter_mut().for_each(|e| e.update_position(dt));
+        self.players.iter_mut().for_each(|e| e.update_position(dt));
         self.enemies.iter_mut().for_each(|e| e.update_position(dt));
         self.projectiles
             .iter_mut()
             .for_each(|e| e.update_position(dt));
 
-        self.entities
+        self.players
             .iter_mut()
             .for_each(|e| physics.update(e, &self.obstacles, dt));
         self.enemies
@@ -160,11 +160,11 @@ impl World {
     }
 
     pub fn remove_entity(&mut self, index: usize) {
-        self.entities.remove(index);
+        self.players.remove(index);
     }
 
     pub fn entity_count(&self) -> usize {
-        self.entities.len()
+        self.players.len()
     }
 
     pub fn obstacle_count(&self) -> usize {
@@ -254,7 +254,7 @@ mod tests {
         let physics = Physics::new();
         world.update_all(&input, &physics, 0.016);
 
-        assert!(world.entities[0].physics_data().x > 0.0);
+        assert!(world.players[0].physics_data().x > 0.0);
     }
 
     #[test]
@@ -270,7 +270,7 @@ mod tests {
         let physics = Physics::new();
         world.update_all(&input, &physics, 0.016);
 
-        let entity = &world.entities[0];
+        let entity = &world.players[0];
         assert!(entity.physics_data().y >= 0.0);
     }
 
@@ -289,8 +289,8 @@ mod tests {
         let physics = Physics::new();
         world.update_all(&input, &physics, 0.016);
 
-        assert!(world.entities[0].physics_data().x > 0.0);
-        assert!(world.entities[1].physics_data().z < 0.0);
+        assert!(world.players[0].physics_data().x > 0.0);
+        assert!(world.players[1].physics_data().z < 0.0);
     }
 
     #[test]
@@ -319,7 +319,7 @@ mod tests {
         let physics = Physics::new();
         world.update_all(&input, &physics, 0.016);
 
-        let entity = &world.entities[0];
+        let entity = &world.players[0];
         // Should hit the solid wall at x=5
         assert!(entity.physics_data().x < 5.5);
     }

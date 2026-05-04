@@ -109,8 +109,8 @@ async fn game_loop() {
         let (mx, my) = mouse_position();
         let (sw, sh) = (screen_width(), screen_height());
         if sw > 0.0 && sh > 0.0 {
-            world.entities[0].gun_angle = (mx / sw - 0.5) * std::f32::consts::PI;
-            world.entities[0].gun_pitch = (0.5 - my / sh) * std::f32::consts::PI;
+            world.players[0].gun_angle = (mx / sw - 0.5) * std::f32::consts::PI;
+            world.players[0].gun_pitch = (0.5 - my / sh) * std::f32::consts::PI;
         }
 
         // Camera rotation with right mouse button
@@ -135,13 +135,13 @@ async fn game_loop() {
 
         // Handle shooting
         if is_mouse_button_pressed(MouseButton::Left) {
-            let projectile = world.entities[0].fire();
+            let projectile = world.players[0].fire();
             world.add_projectile(projectile);
         }
 
         world.update_all(&input, &physics, dt);
 
-        let player_ref = world.entities.first().unwrap();
+        let player_ref = world.players.first().unwrap();
         let p = player_ref.physics_data().pos();
         let s = player_ref.physics_data().size();
 
@@ -181,7 +181,7 @@ async fn game_loop() {
             draw_obstacle(obstacle, GREEN);
         }
 
-        for entity in &world.entities {
+        for entity in &world.players {
             let s = entity.physics_data().size();
             let e = entity.physics_data().pos();
             let size = vec3(s, s, s * 0.5);
@@ -198,7 +198,7 @@ async fn game_loop() {
             draw_projectile(projectile);
         }
 
-        for entity in &world.entities {
+        for entity in &world.players {
             draw_gun(entity);
         }
 
