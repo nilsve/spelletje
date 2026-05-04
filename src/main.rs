@@ -169,7 +169,7 @@ async fn game_loop() {
 
         set_camera(&camera);
 
-        draw_plane(vec3(0.0, 0.0, 0.0), vec2(100.0, 100.0), None, DARKGRAY);
+        draw_plane(vec3(0.0, -1.0, 0.0), vec2(200.0, 200.0), None, DARKGRAY);
 
         for i in -20..=20 {
             let c = DARKGRAY;
@@ -187,7 +187,7 @@ async fn game_loop() {
             let size = vec3(s, s, s * 0.5);
             let pos = vec3(e.0, e.1 + s / 2.0, e.2);
             draw_cube(pos, size, None, BLUE);
-            draw_cube_wires(pos, size, DARKBLUE);
+            // draw_cube_wires(pos, size, DARKBLUE);
         }
 
         for enemy in &world.enemies {
