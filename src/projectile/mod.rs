@@ -64,6 +64,9 @@ impl Projectile {
             return;
         }
         self.lifetime += dt;
+        self.physics_data.x += self.physics_data.vel_x * dt;
+        self.physics_data.y += self.physics_data.vel_y * dt;
+        self.physics_data.z += self.physics_data.vel_z * dt;
     }
 
     /// Returns the position of the projectile.

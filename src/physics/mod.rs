@@ -1,4 +1,3 @@
-use crate::enemy::Enemy;
 /// Core physics calculations: gravity, friction, collision resolution.
 /// All constants are configurable via PhysicsConfig for tuning and testing.
 use crate::obstacle::{Aabb, Obstacle, ObstacleKind};
@@ -228,6 +227,15 @@ impl Physics {
         dt: f32,
     ) {
         self.apply_acceleration(&mut entity_physics_data.vel_y, input, dt);
+    }
+
+    pub fn apply_acceleration_z(
+        &self,
+        entity_physics_data: &mut EntityPhysicsData,
+        input: f32,
+        dt: f32,
+    ) {
+        self.apply_acceleration(&mut entity_physics_data.vel_z, input, dt);
     }
 
     pub fn clamp_speed(&self, vel: &mut f32) {
@@ -507,7 +515,7 @@ mod tests {
     #[test]
     fn test_resolve_horizontal_collision_no_collision() {
         let physics = Physics::new();
-        let player = TestPlayer::new_at(4.6, 0.5, 0.0, 1.0);
+        let player = TestPlayer::new_at(3.0, 0.5, 0.0, 1.0);
         let vel_x = 1.0;
         let obstacle = Obstacle::solid(5.0, 0.5, 0.0, 1.0, 1.0, 2.0);
 

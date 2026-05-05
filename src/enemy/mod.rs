@@ -1,6 +1,6 @@
 use crate::Physics;
 use crate::obstacle::Aabb;
-use crate::physics::{EntityPhysicsData, GlobalPhysicsConfig, PhysicsEntity};
+use crate::physics::{EntityPhysicsData, PhysicsEntity};
 /// Enemy system: autonomous enemies that chase and shoot at the player.
 use crate::player::Player;
 use crate::projectile::Projectile;

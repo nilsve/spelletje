@@ -59,7 +59,16 @@ Build a compact, interesting arena using the existing obstacle/platform system.
 
 ---
 
-## Phase 2: Input System (Controller Only)
+## Phase 2: Input System (Controller Only) ✅ DONE
+
+- [x] Gamepad support via gilrs (optional dependency)
+- [x] `PlayerInput` struct with analog movement
+- [x] `GameInput` struct for multi-player
+- [x] `GamepadInputSource` trait
+- [x] Deadzone handling (0.2)
+- [x] Button/axis mappings for both players
+- [x] `GamepadInputImpl` stub for headless builds
+- [x] Works in both `gui` and `cli` build modes
 
 ### 2a. Gamepad Support
 
@@ -269,6 +278,29 @@ pub enum GameState {
 - Hill indicator on ground (circle showing hill position)
 - Power-up spawn points (pulsing ring)
 - Arena floor color (darker gray for contrast)
+
+---
+
+## Phase 9: Wire Arena Generation
+
+### 9a. Use `create_arena()` in game initialization
+
+`src/arena/mod.rs` already has `create_arena()` returning `Vec<Obstacle>` with:
+- Ground floor (60x0.5x60)
+- Central hill platform (5x0.5x5)
+- 2 high platforms at y=3
+- 4 boundary walls
+- 4 cover blocks (3x3x3)
+- 2 side ramps
+
+Also has helper functions: `arena_bounds()`, `hill_default_position()`, `hill_default_dimensions()`, `high_platform_positions()`, `cover_block_positions()`, `side_ramp_positions()`
+
+**Tasks:**
+- [x] Import `arena` module in `lib.rs`
+- [x] Wire `create_arena()` into `main.rs` game init (replace hardcoded obstacles)
+- [x] Wire `create_arena()` into `headless.rs` init
+- [ ] Wire `create_arena()` into `World` tests
+- [ ] Remove duplicate arena obstacle definitions from `main.rs`/`headless.rs`
 
 ---
 

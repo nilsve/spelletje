@@ -1,8 +1,9 @@
 use crate::PhysicsEntity;
 use crate::enemy::Enemy;
-use crate::input::Input;
+use crate::hill::Hill;
+use crate::input::PlayerInput;
 use crate::obstacle::{Aabb, Obstacle, is_colliding};
-use crate::physics::{CollisionResult, Physics};
+use crate::physics::Physics;
 use crate::player::Player;
 use crate::projectile::Projectile;
 
@@ -41,6 +42,7 @@ pub struct World {
     pub obstacles: Vec<Obstacle>,
     pub projectiles: Vec<Projectile>,
     pub enemies: Vec<Enemy>,
+    pub hill: Hill,
 }
 
 impl World {
@@ -50,6 +52,7 @@ impl World {
             obstacles: Vec::new(),
             projectiles: Vec::new(),
             enemies: Vec::new(),
+            hill: Hill::new(),
         }
     }
 
@@ -115,8 +118,10 @@ impl World {
         self.projectiles = alive;
     }
 
-    pub fn update_all(&mut self, input: &Input, physics: &Physics, dt: f32) {
-        for entity in &mut self.players {
+    pub fn update_all(&mut self, player_inputs: &[PlayerInput], physics: &Physics, dt: f32) {
+        let default_input = PlayerInput::default();
+        for (i, entity) in self.players.iter_mut().enumerate() {
+            let input = player_inputs.get(i).unwrap_or(&default_input);
             entity.update(input, physics, dt);
         }
 
@@ -148,6 +153,9 @@ impl World {
             .iter_mut()
             .for_each(|e| physics.update(e, &self.obstacles, dt));
 
+        // Hill: check which player is on it and update scores
+        self.update_hill();
+
         // Remove dead enemies
         self.enemies.retain(|e| e.alive);
 
@@ -157,6 +165,64 @@ impl World {
         }
 
         self.update_projectiles(dt);
+    }
+
+   pub fn update_hill(&mut self) {
+        // Check which player is on the hill
+        let hill_obstacle = self.hill.to_obstacle();
+        let mut current_holder: Option<usize> = None;
+
+        for (i, player) in self.players.iter().enumerate() {
+            let player_aabb = PlayerAabb {
+                x: player.physics_data().x,
+                y: player.physics_data().y,
+                z: player.physics_data().z,
+                size: player.physics_data().size / 2.0,
+            };
+
+            if is_colliding(&hill_obstacle, &player_aabb) {
+                // Check if player is standing on top of the hill (not inside)
+                let player_top = player_aabb.max_y();
+                let hill_top = hill_obstacle.max_y();
+                if player_top >= hill_obstacle.min_y() && player_top <= hill_top + 1.0 {
+                    current_holder = Some(i);
+                    break;
+                }
+            }
+        }
+
+        // Update hill holder and score
+        if let Some(holder) = current_holder {
+            self.hill.ensure_scores(self.players.len());
+            let earned = self.hill.register_holder(holder);
+            if earned {
+                // Player earned a point
+            }
+        }
+
+        // Update teleport timer
+        if self.hill.teleport_timer >= self.hill.teleport_interval {
+            let new_x = (self.hill.x + 10.0_f32.sin() * 8.0).abs() * (-1.0_f32).signum() * 0.5;
+            let new_z = (self.hill.z + 10.0_f32.cos() * 8.0).abs() * (-1.0_f32).signum() * 0.5;
+            let new_y = 0.5;
+            self.hill.teleport(new_x, new_y, new_z);
+            self.hill.reset_teleport_timer();
+
+            // Add new hill obstacle
+            self.add_obstacle(self.hill.to_obstacle());
+        }
+    }
+
+    pub fn winning_player(&self) -> Option<usize> {
+        self.hill.check_win()
+    }
+
+    pub fn get_hill(&self) -> &Hill {
+        &self.hill
+    }
+
+    pub fn get_hill_mut(&mut self) -> &mut Hill {
+        &mut self.hill
     }
 
     pub fn remove_entity(&mut self, index: usize) {
@@ -193,18 +259,12 @@ impl Default for World {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::input::PlayerInput;
     use crate::obstacle::ObstacleKind;
     use crate::physics::Physics;
 
-    fn default_input() -> Input {
-        Input {
-            left: false,
-            right: false,
-            jump: false,
-            forward: false,
-            backward: false,
-            shoot: false,
-        }
+    fn default_input() -> PlayerInput {
+        PlayerInput::default()
     }
 
     #[test]
@@ -252,7 +312,7 @@ mod tests {
 
         let input = default_input();
         let physics = Physics::new();
-        world.update_all(&input, &physics, 0.016);
+        world.update_all(&[input], &physics, 0.016);
 
         assert!(world.players[0].physics_data().x > 0.0);
     }
@@ -268,7 +328,7 @@ mod tests {
 
         let input = default_input();
         let physics = Physics::new();
-        world.update_all(&input, &physics, 0.016);
+        world.update_all(&[input], &physics, 0.016);
 
         let entity = &world.players[0];
         assert!(entity.physics_data().y >= 0.0);
@@ -287,7 +347,7 @@ mod tests {
 
         let input = default_input();
         let physics = Physics::new();
-        world.update_all(&input, &physics, 0.016);
+        world.update_all(&[input], &physics, 0.016);
 
         assert!(world.players[0].physics_data().x > 0.0);
         assert!(world.players[1].physics_data().z < 0.0);
@@ -317,7 +377,7 @@ mod tests {
 
         let input = default_input();
         let physics = Physics::new();
-        world.update_all(&input, &physics, 0.016);
+        world.update_all(&[input], &physics, 0.016);
 
         let entity = &world.players[0];
         // Should hit the solid wall at x=5
@@ -400,7 +460,7 @@ mod tests {
 
         let input = default_input();
         let physics = Physics::new();
-        world.update_all(&input, &physics, 0.016);
+        world.update_all(&[input], &physics, 0.016);
 
         assert!(world.projectiles[0].physics_data().x > 0.0);
     }

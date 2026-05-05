@@ -5,11 +5,13 @@ use macroquad::camera::{Camera3D, set_camera, set_default_camera};
 #[cfg(feature = "gui")]
 use macroquad::prelude::*;
 
+#[cfg(any(not(feature = "gui"), feature = "cli"))]
+use spelletje_mac::headless;
 use spelletje_mac::PhysicsEntity;
 #[cfg(feature = "gui")]
 use spelletje_mac::enemy::Enemy;
 #[cfg(feature = "gui")]
-use spelletje_mac::input::{InputSource, MacroquadInput};
+use spelletje_mac::input::{GamepadInputImpl, Input, InputSource, MacroquadInput, PlayerInput};
 #[cfg(feature = "gui")]
 use spelletje_mac::obstacle::Obstacle;
 #[cfg(feature = "gui")]
@@ -20,6 +22,8 @@ use spelletje_mac::player::Player;
 use spelletje_mac::projectile::Projectile;
 #[cfg(feature = "gui")]
 use spelletje_mac::world::World;
+#[cfg(feature = "gui")]
+use spelletje_mac::arena::create_arena;
 
 #[cfg(feature = "gui")]
 fn draw_obstacle(obstacle: &Obstacle, color: Color) {
@@ -70,16 +74,16 @@ fn draw_enemy(enemy: &Enemy) {
 #[cfg(feature = "gui")]
 async fn game_loop() {
     let mut world = World::new();
-
-    // world.add_obstacle(Obstacle::solid(5.0, 0., 0.0, 5.0, 5., 100.0));
-    world.add_platform(0.0, -0.25, 0.0, 100.0, 0.5, 100.0);
+    for obstacle in create_arena() {
+        world.add_obstacle(obstacle);
+    }
     world.add_obstacle(Obstacle::solid(5.0, 1.5, 0.0, 4.0, 1., 100.0));
     world.add_platform(-5.0, 2.5, 0.0, 3.0, 0.5, 3.0);
 
-    let player = Player::default();
-    world.add_entity(player);
+    for _ in 0..4 {
+        world.add_entity(Player::default());
+    }
 
-    // Spawn enemies
     world.add_enemy(Enemy::default());
     world.enemies[0].physics_data.x = 10.0;
     world.enemies[0].physics_data.z = 5.0;
@@ -93,27 +97,37 @@ async fn game_loop() {
     world.add_enemy(enemy2);
 
     let physics = Physics::new();
-    let input_source = MacroquadInput;
 
     let mut camera_yaw = 0.0f32;
     let mut camera_pitch = 0.0f32;
     let mut is_panning = false;
     let mut last_mouse_pos = (0.0f32, 0.0f32);
 
+    let gamepad_impl = GamepadInputImpl::new();
+
     loop {
         clear_background(BLACK);
 
-        let dt = get_frame_time().min(1. * 0.1); // Max 0.3 seconds
+        let dt = get_frame_time().min(1. * 0.1);
 
-        // Mouse aiming: map mouse X/Y to gun angle and pitch
-        let (mx, my) = mouse_position();
-        let (sw, sh) = (screen_width(), screen_height());
-        if sw > 0.0 && sh > 0.0 {
-            world.players[0].gun_angle = (mx / sw - 0.5) * std::f32::consts::PI;
-            world.players[0].gun_pitch = (0.5 - my / sh) * std::f32::consts::PI;
-        }
+        GamepadInputImpl::poll();
 
-        // Camera rotation with right mouse button
+        let gamepad_count = gamepad_impl.read_all().player_count();
+
+        let (input, input_count) = if gamepad_count > 0 {
+            (Input::default(), gamepad_count)
+        } else {
+            let input_source = MacroquadInput;
+            let input = input_source.read();
+            (input, 1)
+        };
+
+        let player_inputs: Vec<PlayerInput> = if gamepad_count > 0 {
+            gamepad_impl.read_all().players
+        } else {
+            vec![(&input).into()]
+        };
+
         let right_pressed = is_mouse_button_down(MouseButton::Right);
         if right_pressed && !is_panning {
             is_panning = true;
@@ -131,25 +145,31 @@ async fn game_loop() {
             last_mouse_pos = (cx, cy);
         }
 
-        let input = input_source.read();
+        let shoot_pressed = if gamepad_count > 0 {
+            gamepad_impl
+                .read_all()
+                .players
+                .first()
+                .map(|p| p.shoot)
+                .unwrap_or(false)
+        } else {
+            is_mouse_button_pressed(MouseButton::Left)
+        };
 
-        // Handle shooting
-        if is_mouse_button_pressed(MouseButton::Left) {
+        if shoot_pressed && !world.players.is_empty() {
             let projectile = world.players[0].fire();
             world.add_projectile(projectile);
         }
 
-        world.update_all(&input, &physics, dt);
+        world.update_all(&player_inputs, &physics, dt);
 
+        let screen_aspect = screen_width() / screen_height();
+        let cam_height = 15.0;
         let player_ref = world.players.first().unwrap();
         let p = player_ref.physics_data().pos();
         let s = player_ref.physics_data().size();
-
-        let screen_aspect = sw / screen_height();
-        let cam_height = 15.0;
         let cam_target = vec3(p.0, p.1 + s / 2.0, p.2);
 
-        // Apply camera rotation
         let cos_yaw = camera_yaw.cos();
         let sin_yaw = camera_yaw.sin();
         let cam_dist = cam_height;
@@ -181,13 +201,20 @@ async fn game_loop() {
             draw_obstacle(obstacle, GREEN);
         }
 
-        for entity in &world.players {
+        let player_colors = [
+            Color::new(0.2, 0.2, 1.0, 1.0),
+            Color::new(1.0, 0.2, 0.2, 1.0),
+            Color::new(0.2, 1.0, 0.2, 1.0),
+            Color::new(1.0, 1.0, 0.2, 1.0),
+        ];
+
+        for (i, entity) in world.players.iter().enumerate() {
             let s = entity.physics_data().size();
             let e = entity.physics_data().pos();
             let size = vec3(s, s, s * 0.5);
             let pos = vec3(e.0, e.1 + s / 2.0, e.2);
-            draw_cube(pos, size, None, BLUE);
-            // draw_cube_wires(pos, size, DARKBLUE);
+            let color = player_colors[i % player_colors.len()];
+            draw_cube(pos, size, None, color);
         }
 
         for enemy in &world.enemies {
@@ -210,24 +237,29 @@ async fn game_loop() {
             20.0,
             WHITE,
         );
-        draw_text(
-            &format!("X: {:.1}  Y: {:.1}  Z: {:.1}", p.0, p.1, p.2),
-            10.0,
-            55.0,
-            20.0,
-            YELLOW,
-        );
+
+        for (i, entity) in world.players.iter().enumerate() {
+            let e = entity.physics_data().pos();
+            draw_text(
+                &format!("P{i}: X: {:.1}  Y: {:.1}  Z: {:.1}", e.0, e.1, e.2),
+                10.0,
+                55.0 + (i as f32) * 25.0,
+                20.0,
+                player_colors[i % player_colors.len()],
+            );
+        }
+
         draw_text(
             &format!("Projectiles: {}", world.projectile_count()),
             10.0,
-            80.0,
+            55.0 + (input_count as f32) * 25.0 + 25.0,
             20.0,
             YELLOW,
         );
         draw_text(
             &format!("Enemies: {}", world.enemy_count()),
             10.0,
-            105.0,
+            55.0 + (input_count as f32) * 25.0 + 50.0,
             20.0,
             YELLOW,
         );
