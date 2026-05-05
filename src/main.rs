@@ -104,7 +104,7 @@ async fn game_loop() {
     let mut is_panning = false;
     let mut last_mouse_pos = (0.0f32, 0.0f32);
 
-    let gamepad_impl = GamepadInputImpl::new();
+    let mut gamepad_impl = GamepadInputImpl::new();
 
     loop {
         clear_background(BLACK);

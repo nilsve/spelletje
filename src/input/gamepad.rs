@@ -83,6 +83,7 @@ impl Default for GamepadInputImpl {
     fn default() -> Self {
         Self {
             deadzone: DEFAULT_DEADZONE,
+            gilrs: None,
         }
     }
 }
@@ -100,7 +101,7 @@ impl GamepadInputImpl {
     /// Pump pending gamepad events. Call each frame before reading gamepad state.
     /// Handles gamepad connect/disconnect events.
     /// Must be called before `read_gamepad` or `read_all` for button states to be current.
-    pub fn poll(&self) {
+    pub fn poll(&mut self) {
         if let Some(ref mut gilrs) = self.gilrs {
             while gilrs.next_event().is_some() {}
         }
@@ -143,7 +144,20 @@ impl GamepadInputImpl {
 
         if let Some(ref gilrs) = self.gilrs {
             for (_id, gamepad) in gilrs.gamepads() {
-                let input = self.read_gamepad(gamepad);
+                let mut input = GamepadInput::default();
+
+                let left_x = gamepad.value(gamepad_axis::LEFT_X);
+                let left_y = gamepad.value(gamepad_axis::LEFT_Y);
+                let right_x = gamepad.value(gamepad_axis::RIGHT_X);
+                let right_y = gamepad.value(gamepad_axis::RIGHT_Y);
+
+                input.move_x = apply_deadzone(left_x, self.deadzone);
+                input.move_z = apply_deadzone(left_y, self.deadzone);
+                input.aim_x = right_x;
+                input.aim_y = right_y;
+                input.jump = gamepad.is_pressed(gamepad_btn::BUTTON_A);
+                input.shoot = gamepad.is_pressed(gamepad_btn::RIGHT_TRIGGER);
+
                 game_input.players.push(input.into());
             }
         }

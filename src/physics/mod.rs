@@ -25,6 +25,7 @@ pub struct GlobalPhysicsConfig {
     pub acceleration: f32,
     pub friction: f32,
     pub friction_threshold: f32,
+    pub landing_tolerance: f32,
 }
 
 impl Default for GlobalPhysicsConfig {
@@ -36,6 +37,7 @@ impl Default for GlobalPhysicsConfig {
             acceleration: 20.0,
             friction: 5.0,
             friction_threshold: 0.01,
+            landing_tolerance: 0.2,
         }
     }
 }
@@ -261,7 +263,10 @@ impl Physics {
                 return CollisionResult::None;
             }
 
-            if *vel_y < 0.0 && pd.y <= obstacle.max_y() {
+            if *vel_y < 0.0
+                && pd.y <= obstacle.max_y()
+                && pd.y >= obstacle.max_y() - self.config.landing_tolerance
+            {
                 CollisionResult::Bottom
             } else {
                 CollisionResult::None

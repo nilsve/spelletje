@@ -72,9 +72,9 @@ impl InputSource for MacroquadInput {
         Input {
             left: is_key_down(KeyCode::A),
             right: is_key_down(KeyCode::D),
-            jump: is_key_pressed(KeyCode::W),
+            jump: is_key_pressed(KeyCode::Space),
             forward: is_key_down(KeyCode::S),
-            backward: is_key_down(KeyCode::Space),
+            backward: is_key_down(KeyCode::W),
             shoot: is_mouse_button_pressed(MouseButton::Left),
         }
     }
@@ -84,7 +84,12 @@ impl From<&Input> for PlayerInput {
     fn from(value: &Input) -> Self {
         Self {
             move_x: if value.left { -1.0 } else if value.right { 1.0 } else { 0.0 },
-            move_z: if value.forward { 1.0 } else if value.backward { -1.0 } else { 0.0 },
+            move_z: {
+               let mut z = 0.0;
+               if value.forward { z += 1.0; }
+               if value.backward { z -= 1.0; }
+               z
+           },
             jump: value.jump,
             shoot: value.shoot,
         }
