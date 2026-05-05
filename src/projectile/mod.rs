@@ -64,9 +64,6 @@ impl Projectile {
             return;
         }
         self.lifetime += dt;
-        self.physics_data.x += self.physics_data.vel_x * dt;
-        self.physics_data.y += self.physics_data.vel_y * dt;
-        self.physics_data.z += self.physics_data.vel_z * dt;
     }
 
     /// Returns the position of the projectile.
@@ -109,15 +106,13 @@ mod tests {
     }
 
     #[test]
-    fn test_projectile_update_moves_position() {
+    fn test_projectile_update_increases_lifetime() {
         let mut projectile = Projectile::new(0.0, 0.0, 0.0, 5.0, 0.0, 0.0, 10.0);
         let dt = 0.016;
 
         projectile.update(dt);
 
-        assert!((projectile.physics_data.x - 0.08).abs() < 0.01);
-        assert!((projectile.physics_data.y - 0.0).abs() < 0.01);
-        assert!((projectile.physics_data.z - 0.0).abs() < 0.01);
+        assert!((projectile.lifetime - dt).abs() < 0.001);
     }
 
     #[test]

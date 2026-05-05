@@ -70,9 +70,12 @@ impl From<GamepadInput> for crate::input::PlayerInput {
 /// Usage:
 ///   1. Call `poll()` each frame to pump events (must happen before reading state)
 ///   2. Call `read_all()` to get input from all connected gamepads
+///
+/// NOTE: `poll()` and `read_all()` are no-ops when no gamepad is connected.
 #[cfg(all(not(test), feature = "gui"))]
 pub struct GamepadInputImpl {
     pub deadzone: f32,
+    gilrs: Option<gilrs::Gilrs>,
 }
 
 #[cfg(all(not(test), feature = "gui"))]
@@ -87,14 +90,18 @@ impl Default for GamepadInputImpl {
 #[cfg(all(not(test), feature = "gui"))]
 impl GamepadInputImpl {
     pub fn new() -> Self {
-        Self::default()
+        let gilrs = gilrs::Gilrs::new().ok();
+        Self {
+            deadzone: DEFAULT_DEADZONE,
+            gilrs,
+        }
     }
 
     /// Pump pending gamepad events. Call each frame before reading gamepad state.
     /// Handles gamepad connect/disconnect events.
     /// Must be called before `read_gamepad` or `read_all` for button states to be current.
-    pub fn poll() {
-        if let Ok(mut gilrs) = gilrs::Gilrs::new() {
+    pub fn poll(&self) {
+        if let Some(ref mut gilrs) = self.gilrs {
             while gilrs.next_event().is_some() {}
         }
     }
@@ -134,8 +141,7 @@ impl GamepadInputImpl {
             players: Vec::new(),
         };
 
-        if let Ok(mut gilrs) = gilrs::Gilrs::new() {
-            while gilrs.next_event().is_some() {}
+        if let Some(ref gilrs) = self.gilrs {
             for (_id, gamepad) in gilrs.gamepads() {
                 let input = self.read_gamepad(gamepad);
                 game_input.players.push(input.into());

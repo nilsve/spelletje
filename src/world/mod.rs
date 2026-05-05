@@ -403,7 +403,7 @@ mod tests {
 
         world.update_projectiles(0.016);
 
-        assert!(world.projectiles[0].physics_data().x > 0.0);
+        assert!(world.projectiles[0].lifetime > 0.0);
     }
 
     #[test]

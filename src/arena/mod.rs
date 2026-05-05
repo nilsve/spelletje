@@ -14,6 +14,9 @@ use crate::obstacle::Obstacle;
 ///     =========================================
 ///
 /// Returns a list of obstacles that form the complete arena.
+///
+/// ```ignore
+/// ```
 pub fn create_arena() -> Vec<Obstacle> {
     let mut obstacles = Vec::new();
 

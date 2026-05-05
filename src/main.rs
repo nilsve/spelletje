@@ -7,6 +7,7 @@ use macroquad::prelude::*;
 
 #[cfg(any(not(feature = "gui"), feature = "cli"))]
 use spelletje_mac::headless;
+#[cfg(feature = "gui")]
 use spelletje_mac::PhysicsEntity;
 #[cfg(feature = "gui")]
 use spelletje_mac::enemy::Enemy;
@@ -110,7 +111,7 @@ async fn game_loop() {
 
         let dt = get_frame_time().min(1. * 0.1);
 
-        GamepadInputImpl::poll();
+        gamepad_impl.poll();
 
         let gamepad_count = gamepad_impl.read_all().player_count();
 

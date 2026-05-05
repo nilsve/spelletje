@@ -53,15 +53,6 @@ impl Enemy {
         self.fire_at_coord((target_x, target_y, target_z))
     }
 
-    /// Returns the shoot origin point for the enemy.
-    fn shoot_origin(&self) -> (f32, f32, f32) {
-        (
-            self.physics_data.x,
-            self.physics_data.y + self.physics_data.size / 2.0,
-            self.physics_data.z,
-        )
-    }
-
     /// Updates enemy AI: movement toward player and shooting.
     pub fn update_ai(&mut self, player: &Player, dt: f32, physics: &Physics) {
         if !self.alive {
