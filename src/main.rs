@@ -313,7 +313,12 @@ async fn game_loop() {
         let player_inputs: Vec<PlayerInput> = if gamepad_count > 0 {
             gamepad_impl.read_all().players
         } else if game_state.is_playing() && !world.players.is_empty() {
-            let facing = world.players[0].angle;
+            let (mx, my) = mouse_position();
+            let center_x = screen_width() / 2.0;
+            let center_y = screen_height() / 2.0;
+            camera_yaw = (my - center_y).atan2(mx - center_x);
+            world.players[0].angle = camera_yaw;
+            let facing = camera_yaw;
             let cos_f = facing.cos();
             let sin_f = facing.sin();
             let forward = if input.forward { 1.0 } else if input.backward { -1.0 } else { 0.0 };
@@ -371,16 +376,10 @@ async fn game_loop() {
         };
         let active_players = active_players.min(world.players.len()).max(1);
 
-        // Mouse camera control for player 0 (when no gamepad)
+        // Update camera for player 0 (when no gamepad)
         if gamepad_count == 0 && !world.players.is_empty() {
-            let (mx, my) = mouse_position();
-            let center_x = screen_width() / 2.0;
-            let center_y = screen_height() / 2.0;
-            let mouse_angle = (my - center_y).atan2(mx - center_x);
-            camera_yaw = mouse_angle;
             player_cameras[0].yaw = camera_yaw;
             player_cameras[0].pitch = camera_pitch;
-            world.players[0].angle = camera_yaw;
         }
 
         // Per-player camera control from input
