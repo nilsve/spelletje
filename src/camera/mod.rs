@@ -68,7 +68,7 @@ pub fn build_camera(
         position: cam_pos,
         target: cam_target,
         up: vec3(0.0, -1.0, 0.0),
-        fovy: 60.0,
+        fovy: 45.0,
         aspect: Some(aspect),
         projection: macroquad::camera::Projection::Perspective,
         viewport: Some((vp.x as i32, vp.y as i32, vp.w as i32, vp.h as i32)),
