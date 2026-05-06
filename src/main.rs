@@ -158,7 +158,7 @@ fn draw_menu_hud(gamepad_count: usize) {
         20.0,
         GREEN,
     );
-    draw_text("Press A or W to start", cx - 90.0, 280.0, 24.0, WHITE);
+       draw_text("Press Space to start", cx - 90.0, 280.0, 24.0, WHITE);
 }
 
 fn draw_playing_hud(world: &World) {
@@ -246,7 +246,7 @@ fn draw_game_over_hud(game_state: &GameStateManager, world: &World) {
     );
     draw_text(&score_text, cx - 80.0, 240.0, 24.0, WHITE);
 
-    draw_text("Press A or W to continue", cx - 100.0, 310.0, 24.0, WHITE);
+      draw_text("Press Space to restart", cx - 100.0, 310.0, 24.0, WHITE);
 }
 
 async fn game_loop() {
