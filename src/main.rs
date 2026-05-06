@@ -323,8 +323,8 @@ async fn game_loop() {
             let sin_f = facing.sin();
             let forward = if input.forward { 1.0 } else if input.backward { -1.0 } else { 0.0 };
             let strafe = if input.left { -1.0 } else if input.right { 1.0 } else { 0.0 };
-            let move_x = sin_f * forward + cos_f * strafe;
-            let move_z = cos_f * forward - sin_f * strafe;
+            let move_x = cos_f * forward - sin_f * strafe;
+            let move_z = sin_f * forward + cos_f * strafe;
             vec![PlayerInput {
                 move_x,
                 move_z,
