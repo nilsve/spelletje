@@ -372,7 +372,7 @@ async fn game_loop() {
                 let (dx, dy) = (cx - last_mouse_pos.0, cy - last_mouse_pos.1);
                 camera_yaw += dx * 0.005;
                 camera_pitch -= dy * 0.003;
-                camera_pitch = camera_pitch.max(-1.2).min(1.2);
+                camera_pitch = camera_pitch.max(0.0).min(1.2);
                 last_mouse_pos = (cx, cy);
             }
 
@@ -385,7 +385,7 @@ async fn game_loop() {
             if let Some(input) = player_inputs.get(i) {
                 player_cameras[i].yaw += input.camera_yaw_speed * 2.0 * dt;
                 player_cameras[i].pitch -= input.camera_pitch_speed * 1.5 * dt;
-                player_cameras[i].pitch = player_cameras[i].pitch.max(-1.2).min(1.2);
+                player_cameras[i].pitch = player_cameras[i].pitch.max(0.0).min(1.2);
             }
         }
 
