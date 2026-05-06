@@ -10,7 +10,6 @@
 ///   4. Call `exit()` once after the game loop
 
 /// Gamepad button mapping (gilrs Button enum).
-#[cfg(feature = "gui")]
 pub mod gamepad_btn {
     pub use gilrs::Button as Type;
     pub const BUTTON_A: gilrs::Button = gilrs::Button::South;
@@ -22,7 +21,6 @@ pub mod gamepad_btn {
 }
 
 /// Gamepad axis mapping (gilrs Axis enum).
-#[cfg(feature = "gui")]
 pub mod gamepad_axis {
     pub use gilrs::Axis as Type;
     pub const LEFT_X: gilrs::Axis = gilrs::Axis::LeftStickX;
@@ -60,6 +58,8 @@ impl From<GamepadInput> for crate::input::PlayerInput {
             move_z: value.move_z,
             jump: value.jump,
             shoot: value.shoot,
+            camera_yaw_speed: value.aim_x,
+            camera_pitch_speed: value.aim_y,
         }
     }
 }
@@ -72,13 +72,13 @@ impl From<GamepadInput> for crate::input::PlayerInput {
 ///   2. Call `read_all()` to get input from all connected gamepads
 ///
 /// NOTE: `poll()` and `read_all()` are no-ops when no gamepad is connected.
-#[cfg(all(not(test), feature = "gui"))]
+#[cfg(not(test))]
 pub struct GamepadInputImpl {
     pub deadzone: f32,
     gilrs: Option<gilrs::Gilrs>,
 }
 
-#[cfg(all(not(test), feature = "gui"))]
+#[cfg(not(test))]
 impl Default for GamepadInputImpl {
     fn default() -> Self {
         Self {
@@ -88,7 +88,7 @@ impl Default for GamepadInputImpl {
     }
 }
 
-#[cfg(all(not(test), feature = "gui"))]
+#[cfg(not(test))]
 impl GamepadInputImpl {
     pub fn new() -> Self {
         let gilrs = gilrs::Gilrs::new().ok();
@@ -166,24 +166,24 @@ impl GamepadInputImpl {
     }
 }
 
-#[cfg(all(not(test), feature = "gui"))]
+#[cfg(not(test))]
 impl crate::input::GamepadInputSource for GamepadInputImpl {
     fn read(&self) -> crate::input::GameInput {
         self.read_all()
     }
 }
 
-#[cfg(not(all(not(test), feature = "gui")))]
+#[cfg(test)]
 pub struct GamepadInputImpl;
 
-#[cfg(not(all(not(test), feature = "gui")))]
+#[cfg(test)]
 impl Default for GamepadInputImpl {
     fn default() -> Self {
         Self
     }
 }
 
-#[cfg(not(all(not(test), feature = "gui")))]
+#[cfg(test)]
 impl GamepadInputImpl {
     pub fn new() -> Self {
         Self::default()
@@ -194,7 +194,7 @@ impl GamepadInputImpl {
     }
 }
 
-#[cfg(not(all(not(test), feature = "gui")))]
+#[cfg(test)]
 impl crate::input::GamepadInputSource for GamepadInputImpl {
     fn read(&self) -> crate::input::GameInput {
         self.read_all()
@@ -268,7 +268,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "gui")]
     fn test_gamepad_btn_constants() {
         assert_eq!(gamepad_btn::BUTTON_A as i32, gilrs::Button::South as i32);
         assert_eq!(gamepad_btn::BUTTON_B as i32, gilrs::Button::East as i32);
@@ -285,7 +284,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "gui")]
     fn test_gamepad_axis_constants() {
         assert_eq!(gamepad_axis::LEFT_X as i32, gilrs::Axis::LeftStickX as i32);
         assert_eq!(gamepad_axis::LEFT_Y as i32, gilrs::Axis::LeftStickY as i32);

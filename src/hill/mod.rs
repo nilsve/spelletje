@@ -6,7 +6,7 @@ use crate::obstacle::Obstacle;
 pub const WINNING_SCORE: u32 = 10;
 
 /// Default time (in seconds) a player must stay on the hill to earn a point.
-pub const POINT_TIME: f32 = 3.0;
+pub const POINT_TIME: f32 = 1.0;
 
 /// Hill state tracked by the world.
 #[derive(Debug, Clone)]
@@ -50,7 +50,7 @@ impl Hill {
             scores: Vec::new(),
             finished: false,
             winner: None,
-            teleport_interval: 30.0,
+            teleport_interval: 15.0,
             teleport_timer: 0.0,
         }
     }
@@ -79,10 +79,10 @@ impl Hill {
 
     /// Register that the given player index is on the hill.
     /// Returns true if this player just earned a point.
-    pub fn register_holder(&mut self, player_idx: usize) -> bool {
+    pub fn register_holder(&mut self, player_idx: usize, dt: f32) -> bool {
         self.ensure_scores(player_idx + 1);
         if self.holder == Some(player_idx) {
-            self.timer += 0.016; // approximate frame time
+            self.timer += dt;
             if self.timer >= POINT_TIME {
                 self.scores[player_idx] += 1;
                 self.timer = 0.0;
@@ -222,7 +222,7 @@ mod tests {
         let mut hill = Hill::new();
         hill.init_scores(2);
         // First time — no point earned, timer starts
-        let earned = hill.register_holder(0);
+        let earned = hill.register_holder(0, 0.016);
         assert!(!earned);
         assert_eq!(hill.holder, Some(0));
     }
@@ -233,9 +233,9 @@ mod tests {
         hill.init_scores(2);
         hill.holder = Some(0);
 
-        // Simulate multiple frames (need 188 calls for 3.0 seconds: 188 * 0.016 = 3.008)
-        for _ in 0..188 {
-            hill.register_holder(0);
+        // Simulate multiple frames (need 63 calls for 1.0 seconds: 63 * 0.016 = 1.008)
+        for _ in 0..63 {
+            hill.register_holder(0, 0.016);
         }
 
         assert_eq!(hill.scores[0], 1);
@@ -248,7 +248,7 @@ mod tests {
         hill.holder = Some(0);
         hill.timer = 1.0;
 
-        let earned = hill.register_holder(1);
+        let earned = hill.register_holder(1, 0.016);
         assert!(!earned);
         assert_eq!(hill.holder, Some(1));
         assert!((hill.timer - 0.0).abs() < 0.01);
@@ -325,7 +325,7 @@ mod tests {
 
     #[test]
     fn test_point_time_constant() {
-        assert_eq!(POINT_TIME, 3.0);
+        assert_eq!(POINT_TIME, 1.0);
     }
 
     #[test]

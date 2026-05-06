@@ -5,6 +5,7 @@ use crate::input::PlayerInput;
 use crate::obstacle::{Aabb, Obstacle, is_colliding};
 use crate::physics::Physics;
 use crate::player::Player;
+use crate::powerup::{PowerUp, PowerUpKind};
 use crate::projectile::Projectile;
 
 /// Temporary AABB wrapper for player collision checks.
@@ -43,6 +44,7 @@ pub struct World {
     pub projectiles: Vec<Projectile>,
     pub enemies: Vec<Enemy>,
     pub hill: Hill,
+    pub powerups: Vec<PowerUp>,
 }
 
 impl World {
@@ -53,6 +55,7 @@ impl World {
             projectiles: Vec::new(),
             enemies: Vec::new(),
             hill: Hill::new(),
+            powerups: Vec::new(),
         }
     }
 
@@ -154,7 +157,10 @@ impl World {
             .for_each(|e| physics.update(e, &self.obstacles, dt));
 
         // Hill: check which player is on it and update scores
-        self.update_hill();
+        self.update_hill(dt);
+
+        // Update power-ups and check collection
+        self.update_powerups(dt);
 
         // Remove dead enemies
         self.enemies.retain(|e| e.alive);
@@ -167,7 +173,7 @@ impl World {
         self.update_projectiles(dt);
     }
 
-   pub fn update_hill(&mut self) {
+   pub fn update_hill(&mut self, dt: f32) {
         // Check which player is on the hill
         let hill_obstacle = self.hill.to_obstacle();
         let mut current_holder: Option<usize> = None;
@@ -194,22 +200,58 @@ impl World {
         // Update hill holder and score
         if let Some(holder) = current_holder {
             self.hill.ensure_scores(self.players.len());
-            let earned = self.hill.register_holder(holder);
-            if earned {
-                // Player earned a point
-            }
+            self.hill.register_holder(holder, dt);
         }
 
         // Update teleport timer
-        if self.hill.teleport_timer >= self.hill.teleport_interval {
-            let new_x = (self.hill.x + 10.0_f32.sin() * 8.0).abs() * (-1.0_f32).signum() * 0.5;
-            let new_z = (self.hill.z + 10.0_f32.cos() * 8.0).abs() * (-1.0_f32).signum() * 0.5;
+        if self.hill.update_teleport(dt) {
+            // Remove old hill obstacle
+            self.obstacles.retain(|o| {
+                !((o.x - self.hill.x).abs() < 0.1 && (o.z - self.hill.z).abs() < 0.1 && (o.y - self.hill.y).abs() < 0.1)
+            });
+
+            // Pick new random position within arena bounds
+            let (min_x, max_x, min_z, max_z) = crate::arena::arena_bounds();
+            let new_x = (min_x + 5.0) + (max_x - min_x - 10.0) * (self.hill.teleport_timer * 137.0_f32).sin().abs();
+            let new_z = (min_z + 5.0) + (max_z - min_z - 10.0) * (self.hill.teleport_timer * 251.0_f32).cos().abs();
             let new_y = 0.5;
             self.hill.teleport(new_x, new_y, new_z);
-            self.hill.reset_teleport_timer();
 
             // Add new hill obstacle
             self.add_obstacle(self.hill.to_obstacle());
+        }
+    }
+
+    /// Update power-up timers and check player collection.
+    pub fn update_powerups(&mut self, dt: f32) {
+        for pu in &mut self.powerups {
+            pu.update(dt);
+        }
+
+        // Collect player positions first to avoid borrow conflicts
+        let player_positions: Vec<(f32, f32, f32, f32)> = self.players.iter()
+            .map(|p| {
+                let pd = p.physics_data();
+                (pd.x, pd.y, pd.z, pd.size)
+            })
+            .collect();
+
+        for (i, (px, py, pz, psize)) in player_positions.iter().enumerate() {
+            let player = &mut self.players[i];
+            for pu in &mut self.powerups {
+                if pu.check_collect(*px, *py, *pz, *psize) {
+                    player.active_powerup = Some(pu.kind.clone());
+                    player.powerup_timer = pu.kind.duration();
+                    if pu.kind == PowerUpKind::DoubleJump {
+                        player.double_jump_used = false;
+                    }
+                    if pu.kind == PowerUpKind::BiggerHill {
+                        self.hill.width *= 2.0;
+                        self.hill.depth *= 2.0;
+                    }
+                    break;
+                }
+            }
         }
     }
 
@@ -301,6 +343,15 @@ mod tests {
         world.add_platform(0.0, -0.25, 0.0, 100.0, 0.5, 100.0);
         assert_eq!(world.obstacle_count(), 1);
         assert_eq!(world.obstacles[0].kind, ObstacleKind::Platform);
+    }
+
+    #[test]
+    fn test_world_with_arena() {
+        let mut world = World::new();
+        for obstacle in crate::arena::create_arena() {
+            world.add_obstacle(obstacle);
+        }
+        assert_eq!(world.obstacle_count(), 14);
     }
 
     #[test]

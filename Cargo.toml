@@ -4,9 +4,5 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-macroquad = { version = "0.4", optional = true }
-gilrs = { version = "0.11.1", optional = true }
-[features]
-default = ["gui"]
-gui = ["dep:macroquad", "dep:gilrs"]
-cli = []
+macroquad = "0.4"
+gilrs = "0.11.1"

@@ -1,6 +1,7 @@
 use crate::input::PlayerInput;
 use crate::obstacle::Aabb;
 use crate::physics::{EntityPhysicsData, Physics, PhysicsEntity};
+use crate::powerup::PowerUpKind;
 use crate::projectile::Projectile;
 use crate::shooter::Shooter;
 
@@ -11,6 +12,12 @@ pub struct Player {
     pub gun_angle: f32,
     pub gun_pitch: f32,
     pub is_dead: bool,
+    /// Currently active power-up effect.
+    pub active_powerup: Option<PowerUpKind>,
+    /// Remaining time on the active power-up (seconds).
+    pub powerup_timer: f32,
+    /// For DoubleJump: has the mid-air jump been used this jump arc?
+    pub double_jump_used: bool,
 }
 
 impl Aabb for Player {
@@ -51,6 +58,9 @@ impl Player {
         };
         self.gun_angle = 0.0;
         self.gun_pitch = 0.0;
+        self.active_powerup = None;
+        self.powerup_timer = 0.0;
+        self.double_jump_used = false;
     }
 
     /// Returns the 3D position at the tip of the gun for rendering.
@@ -82,22 +92,47 @@ impl Player {
     }
 
     pub fn update(&mut self, input: &PlayerInput, physics: &Physics, dt: f32) {
+        // Update power-up timer
+        if self.active_powerup.is_some() {
+            self.powerup_timer -= dt;
+            if self.powerup_timer <= 0.0 {
+                let was_double_jump = self.active_powerup == Some(PowerUpKind::DoubleJump);
+                self.active_powerup = None;
+                self.powerup_timer = 0.0;
+                if was_double_jump {
+                    self.double_jump_used = false;
+                }
+            }
+        }
+
+        let speed_mult = if self.active_powerup == Some(PowerUpKind::SpeedBoost) { 2.0 } else { 1.0 };
+
         if input.move_x != 0.0 {
-            physics.apply_acceleration_x(&mut self.physics_data, input.move_x, dt);
+            physics.apply_acceleration_x(&mut self.physics_data, input.move_x * speed_mult, dt);
         } else {
             physics.apply_friction(&mut self.physics_data.vel_x, dt);
         }
 
         if input.move_z != 0.0 {
-            physics.apply_acceleration_z(&mut self.physics_data, input.move_z, dt);
+            physics.apply_acceleration_z(&mut self.physics_data, input.move_z * speed_mult, dt);
         } else {
             physics.apply_friction(&mut self.physics_data.vel_z, dt);
         }
 
         physics.apply_gravity(&mut self.physics_data.vel_y, dt);
 
-        if input.jump && self.is_grounded() {
+        let can_double_jump = self.active_powerup == Some(PowerUpKind::DoubleJump) && !self.double_jump_used;
+
+        if input.jump && (self.is_grounded() || can_double_jump) {
             physics.apply_jump(&mut self.physics_data.vel_y);
+            if can_double_jump {
+                self.double_jump_used = true;
+            }
+        }
+
+        // Reset double jump flag when grounded
+        if self.is_grounded() {
+            self.double_jump_used = false;
         }
 
         physics.clamp_speed(&mut self.physics_data.vel_x);
@@ -139,6 +174,9 @@ impl Default for Player {
             gun_angle: 0.0,
             gun_pitch: 0.0,
             is_dead: false,
+            active_powerup: None,
+            powerup_timer: 0.0,
+            double_jump_used: false,
         }
     }
 }

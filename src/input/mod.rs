@@ -10,6 +10,10 @@ pub struct PlayerInput {
     pub move_z: f32,
     pub jump: bool,
     pub shoot: bool,
+    /// Right stick X for camera yaw rotation.
+    pub camera_yaw_speed: f32,
+    /// Right stick Y for camera pitch rotation.
+    pub camera_pitch_speed: f32,
 }
 
 /// Backward-compatible input struct for keyboard/mouse input.
@@ -62,10 +66,10 @@ impl GameInput {
     }
 }
 
-#[cfg(all(not(test), feature = "gui"))]
+#[cfg(not(test))]
 pub struct MacroquadInput;
 
-#[cfg(all(not(test), feature = "gui"))]
+#[cfg(not(test))]
 impl InputSource for MacroquadInput {
     fn read(&self) -> Input {
         use macroquad::prelude::*;
@@ -82,16 +86,18 @@ impl InputSource for MacroquadInput {
 
 impl From<&Input> for PlayerInput {
     fn from(value: &Input) -> Self {
-        Self {
+  Self {
             move_x: if value.left { -1.0 } else if value.right { 1.0 } else { 0.0 },
             move_z: {
-               let mut z = 0.0;
-               if value.forward { z += 1.0; }
-               if value.backward { z -= 1.0; }
-               z
-           },
+                let mut z = 0.0;
+                if value.forward { z += 1.0; }
+                if value.backward { z -= 1.0; }
+                z
+            },
             jump: value.jump,
             shoot: value.shoot,
+            camera_yaw_speed: 0.0,
+            camera_pitch_speed: 0.0,
         }
     }
 }
@@ -159,6 +165,8 @@ mod tests {
             move_z: -0.5,
             jump: true,
             shoot: true,
+            camera_yaw_speed: 0.3,
+            camera_pitch_speed: -0.2,
         };
         let cloned = input.clone();
         assert!((cloned.move_x - 0.8).abs() < 0.001);
@@ -190,12 +198,16 @@ mod tests {
                     move_z: 0.0,
                     jump: true,
                     shoot: false,
+                    camera_yaw_speed: 0.0,
+                    camera_pitch_speed: 0.0,
                 },
                 PlayerInput {
                     move_x: -1.0,
                     move_z: 0.0,
                     jump: false,
                     shoot: true,
+                    camera_yaw_speed: 0.0,
+                    camera_pitch_speed: 0.0,
                 },
             ],
         };
@@ -261,7 +273,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "gui")]
     fn test_gamepad_btn_constants() {
         assert_eq!(gamepad_btn::BUTTON_A as i32, gilrs::Button::South as i32);
         assert_eq!(gamepad_btn::BUTTON_X as i32, gilrs::Button::West as i32);
@@ -269,7 +280,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "gui")]
     fn test_gamepad_axis_constants() {
         assert_eq!(gamepad_axis::LEFT_X as i32, gilrs::Axis::LeftStickX as i32);
         assert_eq!(gamepad_axis::RIGHT_X as i32, gilrs::Axis::RightStickX as i32);

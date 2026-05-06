@@ -2,21 +2,7 @@ use crate::obstacle::Obstacle;
 
 /// Creates the King of the Hill arena with all platforms, walls, and cover blocks.
 ///
-/// Arena layout (top-down view):
-///
-///                     (high platform)
-///                         ===
-///               (side platform)
-///               ===           ===
-///          (central hill)
-///               ===
-///            (ground floor)
-///     =========================================
-///
 /// Returns a list of obstacles that form the complete arena.
-///
-/// ```ignore
-/// ```
 pub fn create_arena() -> Vec<Obstacle> {
     let mut obstacles = Vec::new();
 
