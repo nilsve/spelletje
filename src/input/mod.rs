@@ -77,8 +77,8 @@ impl InputSource for MacroquadInput {
             left: is_key_down(KeyCode::A),
             right: is_key_down(KeyCode::D),
             jump: is_key_pressed(KeyCode::Space),
-            forward: is_key_down(KeyCode::S),
-            backward: is_key_down(KeyCode::W),
+            forward: is_key_down(KeyCode::W),
+            backward: is_key_down(KeyCode::S),
             shoot: is_mouse_button_pressed(MouseButton::Left),
         }
     }
