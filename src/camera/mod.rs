@@ -67,7 +67,7 @@ pub fn build_camera(
     Camera3D {
         position: cam_pos,
         target: cam_target,
-        up: vec3(0.0, 1.0, 0.0),
+        up: vec3(0.0, -1.0, 0.0),
         fovy: 60.0,
         aspect: Some(aspect),
         projection: macroquad::camera::Projection::Perspective,
