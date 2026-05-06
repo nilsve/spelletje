@@ -290,9 +290,7 @@ async fn game_loop() {
     let mut total_time = 0.0f32;
 
     let mut camera_yaw = 0.0f32;
-    let mut camera_pitch = 0.0f32;
-    let mut is_panning = false;
-    let mut last_mouse_pos = (0.0f32, 0.0f32);
+    let camera_pitch = 0.0f32;
 
     loop {
         clear_background(BLACK);
@@ -314,6 +312,22 @@ async fn game_loop() {
 
         let player_inputs: Vec<PlayerInput> = if gamepad_count > 0 {
             gamepad_impl.read_all().players
+        } else if game_state.is_playing() && !world.players.is_empty() {
+            let facing = world.players[0].gun_angle;
+            let cos_f = facing.cos();
+            let sin_f = facing.sin();
+            let forward = if input.forward { 1.0 } else if input.backward { -1.0 } else { 0.0 };
+            let strafe = if input.left { -1.0 } else if input.right { 1.0 } else { 0.0 };
+            let move_x = sin_f * forward + cos_f * strafe;
+            let move_z = cos_f * forward - sin_f * strafe;
+            vec![PlayerInput {
+                move_x,
+                move_z,
+                jump: input.jump,
+                shoot: input.shoot,
+                camera_yaw_speed: 0.0,
+                camera_pitch_speed: 0.0,
+            }]
         } else {
             vec![(&input).into()]
         };
@@ -358,26 +372,15 @@ async fn game_loop() {
         let active_players = active_players.min(world.players.len()).max(1);
 
         // Mouse camera control for player 0 (when no gamepad)
-        if gamepad_count == 0 {
-            let right_pressed = is_mouse_button_down(MouseButton::Right);
-            if right_pressed && !is_panning {
-                is_panning = true;
-                last_mouse_pos = mouse_position();
-            } else if !right_pressed && is_panning {
-                is_panning = false;
-            }
-
-            if is_panning {
-                let (cx, cy) = mouse_position();
-                let (dx, dy) = (cx - last_mouse_pos.0, cy - last_mouse_pos.1);
-                camera_yaw += dx * 0.005;
-                camera_pitch -= dy * 0.003;
-                camera_pitch = camera_pitch.max(0.0).min(1.2);
-                last_mouse_pos = (cx, cy);
-            }
-
+        if gamepad_count == 0 && !world.players.is_empty() {
+            let (mx, my) = mouse_position();
+            let center_x = screen_width() / 2.0;
+            let center_y = screen_height() / 2.0;
+            let mouse_angle = (my - center_y).atan2(mx - center_x);
+            camera_yaw = mouse_angle;
             player_cameras[0].yaw = camera_yaw;
             player_cameras[0].pitch = camera_pitch;
+            world.players[0].gun_angle = camera_yaw;
         }
 
         // Per-player camera control from input
