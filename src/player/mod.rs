@@ -9,7 +9,7 @@ use crate::shooter::Shooter;
 pub struct Player {
     pub jump_force: f32,
     physics_data: EntityPhysicsData,
-    pub gun_angle: f32,
+    pub angle: f32,
     pub gun_pitch: f32,
     pub is_dead: bool,
     /// Currently active power-up effect.
@@ -56,7 +56,7 @@ impl Player {
             size: 1.0,
             ..EntityPhysicsData::default()
         };
-        self.gun_angle = 0.0;
+        self.angle = 0.0;
         self.gun_pitch = 0.0;
         self.active_powerup = None;
         self.powerup_timer = 0.0;
@@ -66,7 +66,7 @@ impl Player {
     /// Returns the 3D position at the tip of the gun for rendering.
     pub fn gun_end(&self) -> (f32, f32, f32) {
         const GUN_LENGTH: f32 = 1.5;
-        let dir_x = f32::sin(self.gun_angle);
+        let dir_x = f32::sin(self.angle);
         let dir_y = f32::sin(self.gun_pitch);
         let dir_z = 1.0;
         (
@@ -79,9 +79,9 @@ impl Player {
     /// Returns the normalized shoot direction vector based on gun angle and pitch.
     pub fn shoot_direction(&self) -> (f32, f32, f32) {
         let cos_pitch = f32::cos(self.gun_pitch);
-        let dir_x = f32::sin(self.gun_angle) * cos_pitch;
+        let dir_x = f32::sin(self.angle) * cos_pitch;
         let dir_y = f32::sin(self.gun_pitch);
-        let dir_z = 0.; //f32::cos(self.gun_angle) * cos_pitch;
+        let dir_z = 0.; //f32::cos(self.angle) * cos_pitch;
         let len = (dir_x * dir_x + dir_y * dir_y + dir_z * dir_z).sqrt();
         (dir_x / len, dir_y / len, dir_z / len)
     }
@@ -171,7 +171,7 @@ impl Default for Player {
                 ..EntityPhysicsData::default()
             },
             jump_force: 10.0,
-            gun_angle: 0.0,
+            angle: 0.0,
             gun_pitch: 0.0,
             is_dead: false,
             active_powerup: None,
@@ -392,16 +392,16 @@ mod tests {
     }
 
     #[test]
-    fn test_gun_angle_default_is_zero() {
+    fn test_angle_default_is_zero() {
         let player = Player::default();
-        assert!((player.gun_angle - 0.0).abs() < 0.01);
+        assert!((player.angle - 0.0).abs() < 0.01);
     }
 
     #[test]
     fn test_gun_end_points_forward_by_default() {
         let player = Player::default();
         let end = player.gun_end();
-        // With gun_angle=0, should point in +Z direction
+        // With angle=0, should point in +Z direction
         assert!((end.0 - player.physics_data.x).abs() < 0.01);
         assert!(end.2 > player.physics_data.z);
         assert!((end.1 - (player.physics_data.y + player.physics_data.size / 2.0)).abs() < 0.01);
@@ -412,7 +412,7 @@ mod tests {
     // fn test_gun_end_points_right_at_pi_over_2() {
     //     let player = Player::default();
     //     let mut p = player;
-    //     p.gun_angle = std::f32::consts::FRAC_PI_2;
+    //     p.angle = std::f32::consts::FRAC_PI_2;
     //     let end = p.gun_end();
     //     assert!(end.0 > p.physics_data.x);
     //     assert!((end.2 - p.physics_data.z).abs() < 0.01);
@@ -422,7 +422,7 @@ mod tests {
     // fn test_gun_end_points_left_at_minus_pi_over_2() {
     //     let player = Player::default();
     //     let mut p = player;
-    //     p.gun_angle = -std::f32::consts::FRAC_PI_2;
+    //     p.angle = -std::f32::consts::FRAC_PI_2;
     //     let end = p.gun_end();
     //     assert!(end.0 < p.physics_data.x);
     //     assert!((end.2 - p.physics_data.z).abs() < 0.01);
@@ -457,10 +457,10 @@ mod tests {
 
     // TODO: Fix - shoot direction angle math
     // #[test]
-    // fn test_shoot_direction_matches_gun_angle() {
+    // fn test_shoot_direction_matches_angle() {
     //     let player = Player::default();
     //     let mut p = player;
-    //     p.gun_angle = std::f32::consts::FRAC_PI_4;
+    //     p.angle = std::f32::consts::FRAC_PI_4;
     //     let dir = p.shoot_direction();
     //     assert!(dir.0 > 0.0);
     //     assert!(dir.2 > 0.0);
@@ -495,7 +495,7 @@ mod tests {
     fn test_fire_projectile_aims_correctly() {
         let player = Player::default();
         let mut p = player;
-        p.gun_angle = std::f32::consts::FRAC_PI_2; // point right
+        p.angle = std::f32::consts::FRAC_PI_2; // point right
         let projectile = p.fire();
         assert!(projectile.physics_data.vel_x > 10.0);
         assert!(projectile.physics_data.vel_z.abs() < 1.0);
@@ -513,7 +513,7 @@ mod tests {
         player.is_dead = true;
         player.physics_data.x = 100.0;
         player.physics_data.vel_x = 50.0;
-        player.gun_angle = 1.5;
+        player.angle = 1.5;
 
         player.respawn();
 
@@ -524,7 +524,7 @@ mod tests {
         assert!((player.physics_data.vel_x - 0.0).abs() < 0.01);
         assert!((player.physics_data.vel_y - 0.0).abs() < 0.01);
         assert!((player.physics_data.vel_z - 0.0).abs() < 0.01);
-        assert!((player.gun_angle - 0.0).abs() < 0.01);
+        assert!((player.angle - 0.0).abs() < 0.01);
         assert!((player.gun_pitch - 0.0).abs() < 0.01);
     }
 

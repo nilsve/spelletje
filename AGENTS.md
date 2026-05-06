@@ -92,7 +92,7 @@ Wraps `GlobalPhysicsConfig`. Methods:
 pub struct Player {
     pub jump_force: f32,
     physics_data: EntityPhysicsData,
-    pub gun_angle: f32,
+    pub angle: f32,
     pub gun_pitch: f32,
     pub is_dead: bool,
     pub active_powerup: Option<PowerUpKind>,

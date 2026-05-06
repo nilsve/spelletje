@@ -313,7 +313,7 @@ async fn game_loop() {
         let player_inputs: Vec<PlayerInput> = if gamepad_count > 0 {
             gamepad_impl.read_all().players
         } else if game_state.is_playing() && !world.players.is_empty() {
-            let facing = world.players[0].gun_angle;
+            let facing = world.players[0].angle;
             let cos_f = facing.cos();
             let sin_f = facing.sin();
             let forward = if input.forward { 1.0 } else if input.backward { -1.0 } else { 0.0 };
@@ -380,7 +380,7 @@ async fn game_loop() {
             camera_yaw = mouse_angle;
             player_cameras[0].yaw = camera_yaw;
             player_cameras[0].pitch = camera_pitch;
-            world.players[0].gun_angle = camera_yaw;
+            world.players[0].angle = camera_yaw;
         }
 
         // Per-player camera control from input
