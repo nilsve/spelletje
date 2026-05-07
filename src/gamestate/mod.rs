@@ -1,7 +1,6 @@
 /// Game states: Menu, Playing, GameOver.
 
 use crate::input::PlayerInput;
-use crate::hill::WINNING_SCORE;
 
 /// Current state of the game.
 #[derive(Clone, Debug, PartialEq)]

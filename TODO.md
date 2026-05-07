@@ -155,7 +155,30 @@ Helper: `build_game_world()`, `simulate(frames, input_fn)` frame runner
 8. **Visual polish** — colors, effects ✅
 9. **E2E tests** — integration test suite ✅
 
-**All phases complete. 203 tests pass. Build clean.**
+**All phases complete. 203+ tests pass. Build clean.**
+
+---
+
+## Known Issues / Next Steps
+
+### Movement direction not aligned with camera facing
+- Mouse-position camera works (yaw follows mouse from screen center)
+- W/S movement uses world-space axes, not player-facing direction
+- `angle` field on Player tracks camera yaw but movement input is still world-space
+- Need to convert keyboard input to world-space based on player angle before applying to physics
+- atan2(screen_dy, screen_dx) convention needs fixing for correct world direction mapping
+
+### Game restart after GameOver broken
+- GameOver → Menu transition works (jump clears state)
+- Menu → Playing transition does NOT reinitialize the world
+- Old world state persists (scores, positions, power-ups, hill position)
+- Need to extract world creation into `create_world()` and call it on Menu→Playing transition
+- Also need to reset player cameras, total_time, and other persistent state
+
+### Camera pitch not stored per-player
+- Camera pitch stored in main.rs loop variable, not on Player struct
+- Should be stored per-player for split-screen consistency
+- `gun_pitch` exists on Player but is separate from camera pitch
 
 ---
 

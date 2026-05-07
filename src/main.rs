@@ -249,7 +249,7 @@ fn draw_game_over_hud(game_state: &GameStateManager, world: &World) {
       draw_text("Press Space to restart", cx - 100.0, 310.0, 24.0, WHITE);
 }
 
-async fn game_loop() {
+fn create_world() -> World {
     let mut world = World::new();
     for obstacle in create_arena() {
         world.add_obstacle(obstacle);
@@ -260,7 +260,6 @@ async fn game_loop() {
     }
     world.hill.init_scores(4);
 
-    // Power-ups
     world.powerups = create_powerups();
 
     world.add_enemy(Enemy::default());
@@ -275,6 +274,11 @@ async fn game_loop() {
     enemy2.shoot_interval = 1.5;
     world.add_enemy(enemy2);
 
+    world
+}
+
+async fn game_loop() {
+    let mut world = create_world();
     let physics = Physics::new();
 
     let mut player_cameras: Vec<PlayerCamera> = (0..4)
@@ -302,7 +306,7 @@ async fn game_loop() {
 
         let gamepad_count = gamepad_impl.read_all().player_count();
 
-        let (input, input_count) = if gamepad_count > 0 {
+        let (input, _input_count) = if gamepad_count > 0 {
             (Input::default(), gamepad_count)
         } else {
             let input_source = MacroquadInput;
@@ -316,7 +320,7 @@ async fn game_loop() {
             let (mx, my) = mouse_position();
             let center_x = screen_width() / 2.0;
             let center_y = screen_height() / 2.0;
-            camera_yaw = (my - center_y).atan2(mx - center_x);
+            camera_yaw = (center_y - my).atan2(mx - center_x);
             world.players[0].angle = camera_yaw;
             let facing = camera_yaw;
             let cos_f = facing.cos();
@@ -338,7 +342,12 @@ async fn game_loop() {
         };
 
         // Game state transitions
+        let was_menu = game_state.state == GameState::Menu;
         game_state.update(&player_inputs);
+
+        if game_state.is_playing() && was_menu {
+            world = create_world();
+        }
 
         if game_state.is_playing() {
             let shoot_pressed = if gamepad_count > 0 {
