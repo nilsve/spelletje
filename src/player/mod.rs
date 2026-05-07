@@ -107,14 +107,22 @@ impl Player {
 
         let speed_mult = if self.active_powerup == Some(PowerUpKind::SpeedBoost) { 2.0 } else { 1.0 };
 
-        if input.move_x != 0.0 {
-            physics.apply_acceleration_x(&mut self.physics_data, input.move_x * speed_mult, dt);
+        // Rotate input by player angle so movement follows camera direction
+        let cos_a = self.angle.cos();
+        let sin_a = self.angle.sin();
+        // move_x is strafe (A/D), move_z is forward/back (W/S)
+        // forward vector for angle 0 is +Z; strafe right is +X
+       let world_x = input.move_x * cos_a + input.move_z * sin_a;
+        let world_z = -input.move_x * sin_a + input.move_z * cos_a;
+
+        if world_x != 0.0 {
+            physics.apply_acceleration_x(&mut self.physics_data, world_x * speed_mult, dt);
         } else {
             physics.apply_friction(&mut self.physics_data.vel_x, dt);
         }
 
-        if input.move_z != 0.0 {
-            physics.apply_acceleration_z(&mut self.physics_data, input.move_z * speed_mult, dt);
+        if world_z != 0.0 {
+            physics.apply_acceleration_z(&mut self.physics_data, world_z * speed_mult, dt);
         } else {
             physics.apply_friction(&mut self.physics_data.vel_z, dt);
         }
@@ -533,46 +541,44 @@ mod tests {
         let physics = Physics::new();
         let dt = 0.016;
 
-        // Angle 0: facing +X direction (cos(0)=1, sin(0)=0)
+        // Angle 0: forward (move_z=1) moves +Z
         player.angle = 0.0;
+        player.physics_data.vel_x = 0.0;
+        player.physics_data.vel_z = 0.0;
         let input = PlayerInput {
-            move_x: 1.0, // cos(0) * forward
-            move_z: 0.0, // sin(0) * forward
+            move_x: 0.0,
+            move_z: 1.0,
             ..default_input()
         };
         player.update(&input, &physics, dt);
-        assert!(player.physics_data.vel_x > 0.0, "angle=0 should move +X");
-        assert!((player.physics_data.vel_z).abs() < 0.01, "angle=0 should not move Z");
+        assert!((player.physics_data.vel_x).abs() < 0.01, "angle=0 forward should not move X");
+        assert!(player.physics_data.vel_z > 0.0, "angle=0 forward should move +Z");
 
-        // Reset velocity
+        // Angle PI/2: forward (move_z=1) moves +X
         player.physics_data.vel_x = 0.0;
         player.physics_data.vel_z = 0.0;
-
-        // Angle PI/2 (90 degrees): facing +Z direction (cos=0, sin=1)
         player.angle = std::f32::consts::FRAC_PI_2;
         let input = PlayerInput {
-            move_x: 0.0, // cos(PI/2) * forward
-            move_z: 1.0, // sin(PI/2) * forward
+            move_x: 0.0,
+            move_z: 1.0,
             ..default_input()
         };
         player.update(&input, &physics, dt);
-        assert!((player.physics_data.vel_x).abs() < 0.01, "angle=PI/2 should not move X");
-        assert!(player.physics_data.vel_z > 0.0, "angle=PI/2 should move +Z");
+        assert!(player.physics_data.vel_x > 0.0, "angle=PI/2 forward should move +X");
+        assert!((player.physics_data.vel_z).abs() < 0.01, "angle=PI/2 forward should not move Z");
 
-        // Reset velocity
+        // Angle PI: forward (move_z=1) moves -Z
         player.physics_data.vel_x = 0.0;
         player.physics_data.vel_z = 0.0;
-
-        // Angle PI (180 degrees): facing -X direction (cos=-1, sin=0)
         player.angle = std::f32::consts::PI;
         let input = PlayerInput {
-            move_x: -1.0, // cos(PI) * forward
-            move_z: 0.0,   // sin(PI) * forward
+            move_x: 0.0,
+            move_z: 1.0,
             ..default_input()
         };
         player.update(&input, &physics, dt);
-        assert!(player.physics_data.vel_x < 0.0, "angle=PI should move -X");
-        assert!((player.physics_data.vel_z).abs() < 0.01, "angle=PI should not move Z");
+        assert!((player.physics_data.vel_x).abs() < 0.01, "angle=PI forward should not move X");
+        assert!(player.physics_data.vel_z < 0.0, "angle=PI forward should move -Z");
     }
 
     #[test]
@@ -581,7 +587,7 @@ mod tests {
         let physics = Physics::new();
         let dt = 0.016;
 
-        // Angle 0: strafe right maps to +Z (cos(0)=1, sin(0)=0)
+        // Angle 0: forward (move_z=1) should only move Z, not X
         player.angle = 0.0;
         let input = PlayerInput {
             move_x: 0.0,
@@ -589,7 +595,7 @@ mod tests {
             ..default_input()
         };
         player.update(&input, &physics, dt);
-        assert!((player.physics_data.vel_x).abs() < 0.01, "angle=0 strafe should not move X");
-        assert!(player.physics_data.vel_z > 0.0, "angle=0 strafe should move +Z");
+        assert!((player.physics_data.vel_x).abs() < 0.01, "angle=0 forward should not move X");
+        assert!(player.physics_data.vel_z > 0.0, "angle=0 forward should move +Z");
     }
 }
