@@ -37,7 +37,7 @@ impl Projectile {
         let speed = (vel_x * vel_x + vel_y * vel_y + vel_z * vel_z)
             .sqrt()
             .max(0.1);
-        let max_lifetime = speed; // / 10.0;
+        let max_lifetime = speed / 10.0;
         Self {
             physics_data: EntityPhysicsData {
                 x,

@@ -45,9 +45,9 @@ fn draw_enemy(enemy: &Enemy) {
     let s = enemy.size();
     let size = vec3(s, s, s * 0.8);
     let pos_vec = vec3(pos.0, pos.1 + s / 2.0, pos.2);
-    let color = if enemy.health > 30.0 {
+    let color = if enemy.health_ratio() > 0.66 {
         RED
-    } else if enemy.health > 15.0 {
+    } else if enemy.health_ratio() > 0.33 {
         ORANGE
     } else {
         Color::new(0.4, 0.0, 0.0, 1.0)
@@ -269,7 +269,7 @@ fn create_world() -> World {
     let mut enemy2 = Enemy::default();
     enemy2.physics_data.x = -8.0;
     enemy2.physics_data.z = 0.0;
-    enemy2.health = 80.0;
+    enemy2.set_health(80.0);
     enemy2.damage = 15.0;
     enemy2.shoot_interval = 1.5;
     world.add_enemy(enemy2);
@@ -294,12 +294,12 @@ async fn game_loop() {
     let mut total_time = 0.0f32;
 
     let mut camera_yaw = 0.0f32;
-    let camera_pitch = 0.0f32;
+       let mut camera_pitch = 0.0f32;
 
     loop {
         clear_background(BLACK);
 
-        let dt = get_frame_time().min(1. * 0.1);
+        let dt = get_frame_time().min(0.1);
         total_time += dt;
 
         gamepad_impl.poll();
@@ -321,6 +321,7 @@ async fn game_loop() {
             let center_x = screen_width() / 2.0;
             let center_y = screen_height() / 2.0;
             camera_yaw = (center_y - my).atan2(mx - center_x);
+            camera_pitch = ((center_y - my) / center_y * 1.2).max(-1.2).min(1.2);
             world.players[0].angle = camera_yaw;
             let facing = camera_yaw;
             let cos_f = facing.cos();
@@ -396,7 +397,7 @@ async fn game_loop() {
             if let Some(input) = player_inputs.get(i) {
                 player_cameras[i].yaw += input.camera_yaw_speed * 2.0 * dt;
                 player_cameras[i].pitch -= input.camera_pitch_speed * 1.5 * dt;
-                player_cameras[i].pitch = player_cameras[i].pitch.max(0.0).min(1.2);
+                player_cameras[i].pitch = player_cameras[i].pitch.max(-1.2).min(1.2);
             }
         }
 

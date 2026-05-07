@@ -2,7 +2,7 @@ use crate::PhysicsEntity;
 use crate::enemy::Enemy;
 use crate::hill::Hill;
 use crate::input::PlayerInput;
-use crate::obstacle::{Aabb, Obstacle, is_colliding};
+use crate::obstacle::{Aabb, Obstacle, ObstacleKind, is_colliding};
 use crate::physics::Physics;
 use crate::player::Player;
 use crate::powerup::{PowerUp, PowerUpKind};
@@ -115,6 +115,15 @@ impl World {
             }
 
             if !hit {
+                for enemy in &self.enemies {
+                    if is_colliding(&projectile, enemy) {
+                        hit = true;
+                        break;
+                    }
+                }
+            }
+
+            if !hit {
                 alive.push(projectile);
             }
         }
@@ -126,6 +135,13 @@ impl World {
         for (i, entity) in self.players.iter_mut().enumerate() {
             let input = player_inputs.get(i).unwrap_or(&default_input);
             entity.update(input, physics, dt);
+        }
+
+        // Reset BiggerHill if no player has it active
+        let any_bigger_hill = self.players.iter().any(|p| p.active_powerup == Some(PowerUpKind::BiggerHill));
+        if !any_bigger_hill {
+            self.hill.width = self.hill.baseline_width;
+            self.hill.depth = self.hill.baseline_depth;
         }
 
         // Update enemies and collect projectiles
@@ -165,7 +181,7 @@ impl World {
         // Remove dead enemies
         self.enemies.retain(|e| e.alive);
 
-        // Add enemy projectiles
+        // Add enemy projectiles and update all projectiles
         for projectile in enemy_projectiles {
             self.add_projectile(projectile);
         }
@@ -212,8 +228,9 @@ impl World {
 
             // Pick new random position within arena bounds
             let (min_x, max_x, min_z, max_z) = crate::arena::arena_bounds();
-            let new_x = (min_x + 5.0) + (max_x - min_x - 10.0) * (self.hill.teleport_timer * 137.0_f32).sin().abs();
-            let new_z = (min_z + 5.0) + (max_z - min_z - 10.0) * (self.hill.teleport_timer * 251.0_f32).cos().abs();
+            let t = self.hill.teleport_count as f32;
+            let new_x = (min_x + 5.0) + (max_x - min_x - 10.0) * (t * 137.0_f32).sin().abs();
+            let new_z = (min_z + 5.0) + (max_z - min_z - 10.0) * (t * 251.0_f32).cos().abs();
             let new_y = 0.5;
             self.hill.teleport(new_x, new_y, new_z);
 
@@ -246,8 +263,8 @@ impl World {
                         player.double_jump_used = false;
                     }
                     if pu.kind == PowerUpKind::BiggerHill {
-                        self.hill.width *= 2.0;
-                        self.hill.depth *= 2.0;
+                        self.hill.width = self.hill.baseline_width * 2.0;
+                        self.hill.depth = self.hill.baseline_depth * 2.0;
                     }
                     break;
                 }
@@ -280,7 +297,7 @@ impl World {
     }
 
     pub fn platform_count(&self) -> usize {
-        self.obstacle_count()
+        self.obstacles.iter().filter(|o| o.kind == ObstacleKind::Platform).count()
     }
 
     pub fn projectile_count(&self) -> usize {

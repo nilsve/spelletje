@@ -138,11 +138,15 @@ pub fn create_powerups() -> Vec<PowerUp> {
 /// Returns a random power-up kind based on a pseudo-random value.
 fn random_powerup_kind() -> PowerUpKind {
     use std::time::{SystemTime, UNIX_EPOCH};
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
     let ms = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_millis() as u64;
-    match ms % 4 {
+    let n = COUNTER.fetch_add(1, Ordering::Relaxed);
+    let val = ms.wrapping_add(n.wrapping_mul(6364136223846793005)) >> 33;
+    match val % 4 {
         0 => PowerUpKind::SpeedBoost,
         1 => PowerUpKind::DoubleJump,
         2 => PowerUpKind::BiggerHill,

@@ -75,7 +75,7 @@ impl Default for EntityPhysicsData {
             vel_x: 0.,
             vel_y: 0.,
             vel_z: 0.,
-            is_grounded: false,
+            is_grounded: true,
         }
     }
 }
@@ -125,11 +125,7 @@ impl Physics {
         *vel_y = self.config.jump_force;
     }
 
-    pub fn is_grounded(&self, entity_physics_data: &EntityPhysicsData) -> bool {
-        entity_physics_data.y <= self.config.friction_threshold && entity_physics_data.vel_y == 0.0
-    }
-
-    pub fn update<E: PhysicsEntity + Aabb>(
+      pub fn update<E: PhysicsEntity + Aabb>(
         &self,
         physics_entity: &mut E,
         obstacles: &[Obstacle],
@@ -153,7 +149,7 @@ impl Physics {
 
             if collision == CollisionResult::Top {
                 let physics_data = physics_entity.physics_data_mut();
-                physics_data.y = obstacle.min_y() - physics_data.size;
+                physics_data.y = obstacle.min_y() - physics_data.size / 2.0;
                 physics_data.vel_y = 0.0;
             }
 
@@ -280,11 +276,11 @@ impl Physics {
                 return CollisionResult::None;
             }
 
-            if *vel_y < 0.0 && pd.y <= obstacle.max_y() && pd.y >= obstacle.max_y() - 0.5 {
+            if *vel_y < 0.0 && pd.y <= obstacle.max_y() && pd.y >= obstacle.max_y() - self.config.landing_tolerance {
                 CollisionResult::Bottom
             } else if *vel_y > 0.0
                 && pd.y + pd.size >= obstacle.min_y()
-                && pd.y + pd.size <= obstacle.min_y() + 0.5
+                && pd.y + pd.size <= obstacle.min_y() + self.config.landing_tolerance
             {
                 CollisionResult::Top
             } else {

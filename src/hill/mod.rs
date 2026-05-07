@@ -21,6 +21,9 @@ pub struct Hill {
     pub depth: f32,
     /// How long the current player has been standing on the hill (seconds).
     pub timer: f32,
+    /// Baseline dimensions before BiggerHill effects.
+    pub baseline_width: f32,
+    pub baseline_depth: f32,
     /// Which player index currently has the hill (None if no one is on it).
     pub holder: Option<usize>,
     /// Scores per player index.
@@ -33,6 +36,8 @@ pub struct Hill {
     pub teleport_interval: f32,
     /// Timer for next teleport.
     pub teleport_timer: f32,
+    /// Number of times the hill has teleported (used for position variation).
+    pub teleport_count: u32,
 }
 
 impl Hill {
@@ -45,6 +50,9 @@ impl Hill {
             width: 5.0,
             height: 0.5,
             depth: 5.0,
+// Baseline dimensions before BiggerHill effects.
+            baseline_width: 5.0,
+            baseline_depth: 5.0,
             timer: 0.0,
             holder: None,
             scores: Vec::new(),
@@ -52,6 +60,7 @@ impl Hill {
             winner: None,
             teleport_interval: 15.0,
             teleport_timer: 0.0,
+            teleport_count: 0,
         }
     }
 
@@ -104,12 +113,15 @@ impl Hill {
 
     /// Teleport the hill to a new position with random dimensions.
     pub fn teleport(&mut self, new_x: f32, new_y: f32, new_z: f32) {
+        self.teleport_count += 1;
         self.x = new_x;
         self.y = new_y;
         self.z = new_z;
         // Randomize dimensions slightly for variety
-        self.width = 3.0 + (new_x.abs() * 0.5).min(4.0);
-        self.depth = 3.0 + (new_z.abs() * 0.5).min(4.0);
+        self.baseline_width = 3.0 + (new_x.abs() * 0.5).min(4.0);
+        self.baseline_depth = 3.0 + (new_z.abs() * 0.5).min(4.0);
+        self.width = self.baseline_width;
+        self.depth = self.baseline_depth;
         self.height = 0.5;
         self.clear_holder();
     }

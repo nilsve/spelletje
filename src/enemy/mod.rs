@@ -14,6 +14,7 @@ pub struct Enemy {
     pub shoot_interval: f32,
     shoot_range: f32,
     pub health: f32,
+    max_health: f32,
     pub damage: f32,
     detection_range: f32,
     jump_force: f32,
@@ -26,6 +27,7 @@ impl Default for Enemy {
             alive: true,
             shoot_timer: 0.0,
             health: 10.0,
+            max_health: 10.0,
             damage: 1.0,
             shoot_range: 10.0,
             shoot_interval: 1.0,
@@ -61,7 +63,8 @@ impl Enemy {
 
         let dx = player.physics_data().x - self.physics_data.x;
         let dy = player.physics_data().y - self.physics_data.y;
-        let dist = (dx * dx + dy * dy).sqrt();
+        let dz = player.physics_data().z - self.physics_data.z;
+        let dist = (dx * dx + dy * dy + dz * dz).sqrt();
 
         // Movement toward player
         if dx.abs() > 2.0 && dx.abs() < self.detection_range {
@@ -77,14 +80,24 @@ impl Enemy {
                 physics.apply_acceleration_x(&mut self.physics_data, input_x, dt);
             }
 
+            // Z-axis movement toward player
+            let move_dz = player.physics_data().z - self.physics_data.z;
+            let move_len_z = (move_dz * move_dz).sqrt().max(0.01);
+            let normalized_dz = move_dz / move_len_z;
+            if normalized_dz.abs() != 0.0 {
+                physics.apply_acceleration_z(&mut self.physics_data, normalized_dz, dt);
+            }
+
             // Jump if player is above
             if dy > 1.0 && self.physics_data().is_grounded && dist < self.shoot_range * 1.5 {
                 self.physics_data.vel_y = self.jump_force;
             }
 
             physics.clamp_speed(&mut self.physics_data.vel_x);
+            physics.clamp_speed(&mut self.physics_data.vel_z);
         } else {
-            physics.apply_friction(&mut self.physics_data_mut().y, dt);
+            physics.apply_friction(&mut self.physics_data_mut().vel_x, dt);
+            physics.apply_friction(&mut self.physics_data_mut().vel_z, dt);
         }
 
         physics.apply_gravity(&mut self.physics_data_mut().vel_y, dt);
@@ -124,6 +137,17 @@ impl Enemy {
         if self.health <= 0.0 {
             self.alive = false;
         }
+    }
+
+    /// Returns health as a ratio between 0.0 and 1.0.
+    pub fn health_ratio(&self) -> f32 {
+        (self.health / self.max_health).clamp(0.0, 1.0)
+    }
+
+    /// Sets both health and max_health (for boss enemies).
+    pub fn set_health(&mut self, health: f32) {
+        self.health = health;
+        self.max_health = health;
     }
 }
 
@@ -178,7 +202,6 @@ impl Aabb for Enemy {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
 
     // #[test]
     // fn test_enemy_creation() {

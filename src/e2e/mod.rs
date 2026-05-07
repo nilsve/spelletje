@@ -4,7 +4,6 @@
 use crate::arena::create_arena;
 use crate::gamestate::{GameState, GameStateManager};
 use crate::input::PlayerInput;
-use crate::obstacle::ObstacleKind;
 use crate::physics::{Physics, PhysicsEntity};
 use crate::player::Player;
 use crate::powerup::{create_powerups, PowerUpKind};
@@ -266,7 +265,7 @@ fn test_double_jump_allows_airborne_jump() {
     }];
     simulate(&mut world, &inputs, 3, 0.016);
 
-    let y_after_first = world.players[0].physics_data().y;
+    let _y_after_first = world.players[0].physics_data().y;
 
     // Second jump (should NOT work since double jump used)
     simulate(&mut world, &inputs, 3, 0.016);
@@ -379,26 +378,30 @@ fn test_full_game_loop_simulation() {
 fn test_projectile_hits_enemy() {
     let mut world = build_game_world(1);
 
-    // Place enemy in front of player
+    // Add a platform for the enemy to stand on at projectile height
+    world.add_platform(10.0, 1.25, 1.5, 3.0, 0.5, 3.0);
+
+    // Place enemy on the platform
     let mut enemy = crate::enemy::Enemy::default();
     enemy.physics_data.x = 10.0;
-    enemy.physics_data.y = 1.0;
-    enemy.physics_data.z = 0.0;
+    enemy.physics_data.y = 1.5;
+    enemy.physics_data.z = 1.5;
     world.add_enemy(enemy);
 
     // Player fires projectile toward enemy
     world.players[0].physics_data_mut().x = 0.0;
     world.players[0].physics_data_mut().y = 1.0;
     world.players[0].physics_data_mut().z = 0.0;
+    world.players[0].angle = std::f32::consts::FRAC_PI_2; // Aim right toward enemy at x=10
 
     let projectile = world.players[0].fire();
     world.add_projectile(projectile);
 
-    // Update projectiles - should hit enemy or obstacle
+    // Simulate - projectile should hit enemy
     let inputs = vec![PlayerInput::default()];
-    simulate(&mut world, &inputs, 30, 0.016);
+    simulate(&mut world, &inputs, 60, 0.016);
 
-    // Projectile should have been removed (hit something)
+    // Projectile should have been removed (hit enemy)
     assert_eq!(world.projectile_count(), 0);
 }
 
@@ -426,7 +429,7 @@ fn test_multiple_powerups_spawn_over_time() {
     let mut world = build_game_world(1);
 
     // Initially all power-ups are inactive (staggered)
-    let active_initially = world.powerups.iter().filter(|p| p.active).count();
+    let _active_initially = world.powerups.iter().filter(|p| p.active).count();
 
     // Simulate a while to let power-ups spawn
     let inputs = vec![PlayerInput::default()];
